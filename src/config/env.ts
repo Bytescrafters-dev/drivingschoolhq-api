@@ -1,0 +1,60 @@
+export interface Env {
+  DATABASE_URL: string;
+  PLATFORM_JWT_SECRET: string;
+  PLATFORM_ACCESS_TOKEN_TTL_SECONDS: number;
+  PLATFORM_REFRESH_TOKEN_TTL_DAYS: number;
+  PLATFORM_AUTH_RATE_LIMIT: number;
+  PLATFORM_AUTH_RATE_WINDOW_SECONDS: number;
+}
+
+const MIN_JWT_SECRET_LENGTH = 32;
+
+function positiveInt(raw: unknown, name: string, fallback: number): number {
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+/** Validates process environment at boot; used by ConfigModule.forRoot. */
+export function validateEnv(raw: Record<string, unknown>): Env {
+  const databaseUrl = raw.DATABASE_URL;
+  if (typeof databaseUrl !== 'string' || !databaseUrl) {
+    throw new Error('DATABASE_URL is required');
+  }
+  const jwtSecret = raw.PLATFORM_JWT_SECRET;
+  if (
+    typeof jwtSecret !== 'string' ||
+    jwtSecret.length < MIN_JWT_SECRET_LENGTH
+  ) {
+    throw new Error(
+      `PLATFORM_JWT_SECRET is required and must be at least ${MIN_JWT_SECRET_LENGTH} characters`,
+    );
+  }
+  return {
+    DATABASE_URL: databaseUrl,
+    PLATFORM_JWT_SECRET: jwtSecret,
+    PLATFORM_ACCESS_TOKEN_TTL_SECONDS: positiveInt(
+      raw.PLATFORM_ACCESS_TOKEN_TTL_SECONDS,
+      'PLATFORM_ACCESS_TOKEN_TTL_SECONDS',
+      900,
+    ),
+    PLATFORM_REFRESH_TOKEN_TTL_DAYS: positiveInt(
+      raw.PLATFORM_REFRESH_TOKEN_TTL_DAYS,
+      'PLATFORM_REFRESH_TOKEN_TTL_DAYS',
+      7,
+    ),
+    PLATFORM_AUTH_RATE_LIMIT: positiveInt(
+      raw.PLATFORM_AUTH_RATE_LIMIT,
+      'PLATFORM_AUTH_RATE_LIMIT',
+      5,
+    ),
+    PLATFORM_AUTH_RATE_WINDOW_SECONDS: positiveInt(
+      raw.PLATFORM_AUTH_RATE_WINDOW_SECONDS,
+      'PLATFORM_AUTH_RATE_WINDOW_SECONDS',
+      60,
+    ),
+  };
+}

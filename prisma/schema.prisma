@@ -11,3 +11,109 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// =============================================================================
+// PLATFORM DOMAIN — platform administration
+// =============================================================================
+
+/// Fixed platform roles. Role → permission mapping lives in application code;
+/// authorization checks must be permission-based, never role-name based.
+enum PlatformRole {
+  SUPER_ADMIN
+  OPERATIONS_ADMIN
+  BILLING_ADMIN
+  SUPPORT
+}
+
+enum PlatformAdminStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// Operator of the SaaS platform. Not tenant-owned and independent from
+/// TenantUser / tenant RBAC. Admins are never hard-deleted; they are DISABLED
+/// so that historical references (payments recorded, audit logs) stay valid.
+model PlatformAdminUser {
+  id                 String              @id @default(uuid()) @db.Uuid
+  /// Normalised (trimmed, lowercased) by the application before persisting.
+  email              String              @unique
+  fullName           String
+  passwordHash       String
+  role               PlatformRole
+  status             PlatformAdminStatus @default(ACTIVE)
+  /// True while the admin holds a temporary password set by a super admin.
+  mustChangePassword Boolean             @default(true)
+  passwordChangedAt  DateTime?
+  lastLoginAt        DateTime?
+  disabledAt         DateTime?
+
+  /// Null only for the seeded bootstrap super admin.
+  createdById   String?             @db.Uuid
+  createdBy     PlatformAdminUser?  @relation("PlatformAdminCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAdmins PlatformAdminUser[] @relation("PlatformAdminCreatedBy")
+
+  sessions        PlatformAdminSession[]
+  auditLogEntries PlatformAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, status])
+  @@index([createdById])
+  @@map("platform_admin_users")
+}
+
+enum PlatformSessionRevokedReason {
+  LOGOUT
+  ROTATED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  ROLE_CHANGED
+  ADMIN_DISABLED
+  REFRESH_TOKEN_REUSE
+}
+
+/// One login session of a platform admin. Holds the hash of the current
+/// refresh token; each refresh rotates to a new session row.
+model PlatformAdminSession {
+  id               String                        @id @default(uuid()) @db.Uuid
+  adminId          String                        @db.Uuid
+  admin            PlatformAdminUser             @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  /// SHA-256 hex of the opaque refresh token. The raw token is never stored.
+  refreshTokenHash String                        @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revokedReason    PlatformSessionRevokedReason?
+  /// Session that replaced this one on refresh-token rotation.
+  replacedById     String?                       @db.Uuid
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime                      @default(now())
+
+  @@index([adminId, revokedAt])
+  @@map("platform_admin_sessions")
+}
+
+/// Append-only record of who did what on the platform. Rows are never
+/// updated or deleted (enforced by a database trigger).
+model PlatformAuditLog {
+  id           String             @id @default(uuid()) @db.Uuid
+  /// Null when there is no authenticated actor (e.g. failed login).
+  actorAdminId String?            @db.Uuid
+  actorAdmin   PlatformAdminUser? @relation(fields: [actorAdminId], references: [id], onDelete: Restrict)
+  /// Code-defined PlatformAuditAction value.
+  action       String
+  targetType   String?
+  targetId     String?
+  /// Changed fields / context only. Never secrets or password material.
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime           @default(now())
+
+  @@index([createdAt])
+  @@index([actorAdminId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([action, createdAt])
+  @@map("platform_audit_logs")
+}

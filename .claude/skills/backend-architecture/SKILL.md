@@ -6,9 +6,11 @@ description: Design and implement NestJS modular-monolith features using thin co
 # Backend Architecture
 
 ## Goal
+
 Keep features in the correct domain, consistent with the repository's existing NestJS conventions. **Read `CLAUDE.md` first.** Inspect nearby implementations before deciding a design.
 
 ## Required implementation sequence
+
 1. Identify the actor: platform admin, tenant user, or trusted system job.
 2. Identify the owning domain, aggregate and authoritative records.
 3. Identify tenant/branch/customer/platform scope and cross-module dependencies.
@@ -16,8 +18,10 @@ Keep features in the correct domain, consistent with the repository's existing N
 5. Specify invariants, error paths, transaction boundaries and tests before editing.
 6. Choose the smallest change compatible with existing patterns.
 7. Implement, then self-review with `backend-testing` and `backend-verification`.
+8. Do not add comments and emojis everywhere. Comment only if there is something critical to note.
 
 ## Default dependency direction
+
 ```text
 Controller → Application/Domain Service → Repository Interface
                                              ↑
@@ -34,6 +38,7 @@ Controller → Application/Domain Service → Repository Interface
 - Follow the actual repository layout instead of generating parallel abstractions.
 
 ## Non-negotiable domain boundaries
+
 - **Platform**: platform admins, tenants, plans, subscriptions, entitlements, SaaS invoices/payments, access and platform audit.
 - **Tenant operations**: tenant users/roles, branches, instructors, vehicles.
 - **Customer & licence case**: customers, applications, classes, medical, exams, permits, training, licences.
@@ -43,6 +48,7 @@ Controller → Application/Domain Service → Repository Interface
 Do not have one domain import another module's private repository or Prisma model implementation. Prefer a narrow exported use-case service or a read-only interface. Reconsider module responsibilities before using `forwardRef()`.
 
 ## Business rules and persistence
+
 - Give operations business names: `recordTenantPayment`, `scheduleTrainingSession`, `recordWrittenTestResult`.
 - Validate actor permission, resource ownership, state transition and relevant entitlement separately.
 - Keep customer profile separate from application-time snapshots; keep attempts immutable as history.
@@ -50,17 +56,20 @@ Do not have one domain import another module's private repository or Prisma mode
 - Use events/jobs for post-commit effects only when justified; do not introduce microservices or a generic workflow engine.
 
 ## API design
+
 - Use request DTO validation plus independent domain validation.
 - Do not leak Prisma errors, internal stack traces or cross-tenant existence.
 - Prefer explicit error codes such as `PLAN_LIMIT_REACHED`, `INVALID_APPLICATION_STATE`.
 - Use established exception/response patterns, not a new global framework.
 
 ## Detailed references (read only when relevant)
+
 - [module-boundaries.md](module-boundaries.md) — module ownership, public APIs, coupling rules.
 - [SOLID.md](SOLID.md) — applying SOLID pragmatically in NestJS.
 - [examples.md](examples.md) — DI-token module and cross-module orchestration examples.
 
 ## Completion checklist
+
 - [ ] Correct domain owns the feature and data.
 - [ ] No Prisma queries or business rules in controllers.
 - [ ] Services depend on appropriate repository interfaces.

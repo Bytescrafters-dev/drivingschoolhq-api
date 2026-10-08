@@ -35,6 +35,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?PLATFORM_JWT_SECRET must be set (min 32 chars)}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-drivingschoolhq}?schema=public
     ports:
       - "${API_PORT:-3000}:3000"
