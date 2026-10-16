@@ -4,7 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { Env } from '../../config/env.js';
 import { PlatformAuthGuard } from './guards/platform-auth.guard.js';
 import { PlatformPermissionGuard } from './guards/platform-permission.guard.js';
-import { PasswordHasher } from './common/password-hasher.js';
+import { PasswordHasher } from '../../common/security/password-hasher.js';
 import { PLATFORM_SESSION_REPOSITORY } from './interfaces/platform-session.repository.js';
 import {
   PLATFORM_TOKEN_AUDIENCE,

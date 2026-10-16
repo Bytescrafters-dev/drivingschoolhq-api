@@ -9,7 +9,7 @@ import {
 } from '../../generated/prisma/enums.js';
 import { TransactionManager } from '../../prisma/transaction-manager.js';
 import type { AuthenticatedPlatformAdmin } from '../admin-auth/interfaces/authenticated-platform-admin.js';
-import { PasswordHasher } from '../admin-auth/common/password-hasher.js';
+import { PasswordHasher } from '../../common/security/password-hasher.js';
 import {
   PLATFORM_SESSION_REPOSITORY,
   type PlatformSessionRepository,
@@ -20,7 +20,7 @@ import {
 } from '../audit/common/platform-audit-action.js';
 import { PlatformAuditService } from '../audit/platform-audit.service.js';
 import type { AuditMetadata } from '../audit/interfaces/platform-audit.repository.js';
-import { normalizeEmail } from './common/email.js';
+import { normalizeEmail } from '../../common/text/email.js';
 import {
   PLATFORM_ADMIN_USER_REPOSITORY,
   type PlatformAdmin,

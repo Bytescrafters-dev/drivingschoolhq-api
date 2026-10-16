@@ -3,7 +3,7 @@ import {
   PlatformRole,
 } from '../../src/generated/prisma/enums.js';
 import type { PrismaClient } from '../../src/generated/prisma/client.js';
-import { PasswordHasher } from '../../src/platform/admin-auth/common/password-hasher.js';
+import { PasswordHasher } from '../../src/common/security/password-hasher.js';
 
 const hasher = new PasswordHasher();
 

@@ -7,7 +7,7 @@ import {
 } from '../../src/generated/prisma/enums.js';
 import type { TransactionManager } from '../../src/prisma/transaction-manager.js';
 import type { AuthenticatedPlatformAdmin } from '../../src/platform/admin-auth/interfaces/authenticated-platform-admin.js';
-import type { PasswordHasher } from '../../src/platform/admin-auth/common/password-hasher.js';
+import type { PasswordHasher } from '../../src/common/security/password-hasher.js';
 import type {
   NewPlatformSession,
   PlatformSession,

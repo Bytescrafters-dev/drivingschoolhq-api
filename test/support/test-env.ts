@@ -34,6 +34,10 @@ export function applyTestEnv(): void {
   process.env.DATABASE_URL = resolveTestDatabaseUrl();
   process.env.PLATFORM_JWT_SECRET ??=
     'test-platform-jwt-secret-at-least-32-characters';
+  process.env.TENANT_JWT_SECRET ??=
+    'test-tenant-jwt-secret-at-least-32-characters!';
   process.env.PLATFORM_AUTH_RATE_LIMIT = '1000';
   process.env.PLATFORM_AUTH_RATE_WINDOW_SECONDS = '60';
+  // Background jobs would race with test fixtures; tests invoke them directly.
+  process.env.JOBS_ENABLED = 'false';
 }

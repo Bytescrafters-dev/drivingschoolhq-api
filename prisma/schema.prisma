@@ -55,6 +55,12 @@ model PlatformAdminUser {
   sessions        PlatformAdminSession[]
   auditLogEntries PlatformAuditLog[]
 
+  createdPricePlans      PricePlan[]
+  createdTenants         Tenant[]
+  createdSubscriptions   TenantSubscription[] @relation("TenantSubscriptionCreatedBy")
+  cancelledSubscriptions TenantSubscription[] @relation("TenantSubscriptionCancelledBy")
+  createdTenantUsers     TenantUser[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -116,4 +122,416 @@ model PlatformAuditLog {
   @@index([targetType, targetId, createdAt])
   @@index([action, createdAt])
   @@map("platform_audit_logs")
+}
+
+// =============================================================================
+// PLATFORM DOMAIN — plan catalogue
+// =============================================================================
+
+enum PricePlanStatus {
+  /// Being configured; cannot be selected for new subscriptions.
+  DRAFT
+  /// Selectable for new subscriptions.
+  ACTIVE
+  /// No longer offered. Existing subscriptions keep working from their snapshot.
+  ARCHIVED
+}
+
+enum BillingPeriod {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum PlanPriceStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Quantitative limits. Enforcement lives in a plan-access service, never in
+/// plan-name conditionals.
+enum PlanLimitCode {
+  MAX_STAFF_USERS
+  MAX_BRANCHES
+  MAX_INSTRUCTORS
+  MAX_VEHICLES
+}
+
+/// Feature entitlements (on/off).
+enum PlanFeatureCode {
+  MULTI_BRANCH
+  SMS_NOTIFICATIONS
+  ADVANCED_REPORTING
+  API_ACCESS
+}
+
+/// Commercial product in the SaaS catalogue (e.g. STARTER, PROFESSIONAL).
+/// Never hard-deleted: archive instead, subscriptions keep referencing it.
+model PricePlan {
+  id          String          @id @default(uuid()) @db.Uuid
+  /// Normalised (trimmed, uppercased) by the application before persisting.
+  code        String          @unique
+  name        String
+  description String?
+  status      PricePlanStatus @default(DRAFT)
+  /// False for private/custom-deal plans that are not listed publicly.
+  isPublic    Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  archivedAt  DateTime?
+
+  createdById String            @db.Uuid
+  createdBy   PlatformAdminUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  prices        PlanPrice[]
+  limits        PlanLimit[]
+  features      PlanFeature[]
+  subscriptions TenantSubscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sortOrder])
+  @@map("price_plans")
+}
+
+/// Price of a plan for one billing period. Immutable once created: a price
+/// change archives the old row and creates a new one. At most one ACTIVE price
+/// per (plan, billing period) — enforced by a partial unique index.
+/// All amounts on the platform are LKR.
+model PlanPrice {
+  id            String          @id @default(uuid()) @db.Uuid
+  planId        String          @db.Uuid
+  plan          PricePlan       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  billingPeriod BillingPeriod
+  amount        Decimal         @db.Decimal(12, 2)
+  status        PlanPriceStatus @default(ACTIVE)
+  archivedAt    DateTime?
+
+  subscriptions TenantSubscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planId, id])
+  @@index([planId, status])
+  @@map("plan_prices")
+}
+
+/// Numeric limit of a plan. `value = null` means unlimited.
+model PlanLimit {
+  id     String        @id @default(uuid()) @db.Uuid
+  planId String        @db.Uuid
+  plan   PricePlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  code   PlanLimitCode
+  value  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planId, code])
+  @@map("plan_limits")
+}
+
+/// Feature included in a plan. Presence of the row grants the feature.
+model PlanFeature {
+  id     String          @id @default(uuid()) @db.Uuid
+  planId String          @db.Uuid
+  plan   PricePlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  code   PlanFeatureCode
+
+  createdAt DateTime @default(now())
+
+  @@unique([planId, code])
+  @@map("plan_features")
+}
+
+// =============================================================================
+// PLATFORM DOMAIN — tenants and subscriptions
+// =============================================================================
+
+/// The 25 administrative districts of Sri Lanka.
+enum District {
+  AMPARA
+  ANURADHAPURA
+  BADULLA
+  BATTICALOA
+  COLOMBO
+  GALLE
+  GAMPAHA
+  HAMBANTOTA
+  JAFFNA
+  KALUTARA
+  KANDY
+  KEGALLE
+  KILINOCHCHI
+  KURUNEGALA
+  MANNAR
+  MATALE
+  MATARA
+  MONARAGALA
+  MULLAITIVU
+  NUWARA_ELIYA
+  POLONNARUWA
+  PUTTALAM
+  RATNAPURA
+  TRINCOMALEE
+  VAVUNIYA
+}
+
+/// Lifecycle of the tenant on the platform. Billing-driven access is tracked
+/// separately in TenantAccess.
+enum TenantStatus {
+  ACTIVE
+  CLOSED
+}
+
+/// One driving school using the SaaS. Never hard-deleted: CLOSED instead.
+model Tenant {
+  id          String       @id @default(uuid()) @db.Uuid
+  /// Government-issued driving school code. Normalised (trimmed, uppercased).
+  /// Also the tenant identifier used at tenant-user login.
+  dsCode      String       @unique
+  /// Legal / registered name.
+  name        String
+  displayName String
+  address     String
+  district    District
+  /// Normalised to +94XXXXXXXXX by the application.
+  phone       String
+  status      TenantStatus @default(ACTIVE)
+  closedAt    DateTime?
+
+  createdById String            @db.Uuid
+  createdBy   PlatformAdminUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  subscriptions TenantSubscription[]
+  access        TenantAccess?
+  users         TenantUser[]
+  userSessions  TenantUserSession[]
+  auditLogs     TenantAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([district])
+  @@map("tenants")
+}
+
+enum TenantSubscriptionStatus {
+  /// Plan change waiting for the current period to end.
+  SCHEDULED
+  /// The tenant's current subscription.
+  ACTIVE
+  /// Replaced by a scheduled change or ended at period end.
+  ENDED
+  /// Cancelled (a scheduled change withdrawn, or the subscription terminated).
+  CANCELLED
+}
+
+/// Binding of a tenant to a plan price. Rows are history and are never
+/// overwritten: a plan change ends the current row and activates a new one.
+/// Commercial terms are snapshotted so catalogue changes never alter them.
+/// At most one ACTIVE and one SCHEDULED row per tenant (partial unique indexes).
+model TenantSubscription {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  planId      String    @db.Uuid
+  plan        PricePlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  planPriceId String    @db.Uuid
+  /// Composite FK guarantees the price belongs to the plan.
+  planPrice   PlanPrice @relation(fields: [planId, planPriceId], references: [planId, id], onDelete: Restrict)
+
+  // --- snapshot of agreed commercial terms ---
+  planCode        String
+  planName        String
+  billingPeriod   BillingPeriod
+  /// Catalogue price (LKR) at the time of subscribing.
+  listAmount      Decimal       @db.Decimal(12, 2)
+  /// Price the tenant actually pays per period (may be discounted).
+  agreedAmount    Decimal       @db.Decimal(12, 2)
+  /// Required whenever agreedAmount differs from listAmount.
+  discountReason  String?
+  gracePeriodDays Int
+
+  status TenantSubscriptionStatus
+
+  /// First day of the subscription.
+  startDate    DateTime  @db.Date
+  /// Last day of the free trial; null when there is no trial. Billing is
+  /// anchored on trialEndDate when present, otherwise on startDate.
+  trialEndDate DateTime? @db.Date
+  /// Last day of the subscription; set when it is ENDED.
+  endDate      DateTime? @db.Date
+
+  cancelledAt        DateTime?
+  cancelledById      String?            @db.Uuid
+  cancelledBy        PlatformAdminUser? @relation("TenantSubscriptionCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+  cancellationReason String?
+
+  createdById String            @db.Uuid
+  createdBy   PlatformAdminUser @relation("TenantSubscriptionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, startDate])
+  @@index([planId, planPriceId])
+  @@map("tenant_subscriptions")
+}
+
+enum TenantAccessStatus {
+  ACTIVE
+  GRACE_PERIOD
+  SUSPENDED
+}
+
+/// Whether the tenant may use the SaaS. Separate from TenantUser.status:
+/// suspending a tenant never disables its users.
+model TenantAccess {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String             @unique @db.Uuid
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  status          TenantAccessStatus @default(ACTIVE)
+  statusChangedAt DateTime           @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenant_access")
+}
+
+// =============================================================================
+// DRIVING-SCHOOL DOMAIN — tenant users
+// =============================================================================
+
+/// Fixed tenant roles. Role → permission mapping lives in application code.
+/// Exactly one OWNER per tenant (partial unique index); the OWNER is managed
+/// only by platform admins.
+enum TenantRole {
+  OWNER
+  ADMIN
+  BRANCH_MANAGER
+  FRONT_DESK
+  INSTRUCTOR
+  ACCOUNTANT
+}
+
+enum TenantUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// Authenticated user of a driving school. Independent from PlatformAdminUser.
+/// Never hard-deleted: DISABLED instead.
+model TenantUser {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  /// Normalised (trimmed, lowercased). Unique within the tenant.
+  email              String
+  fullName           String
+  /// Normalised to +94XXXXXXXXX. Required for the OWNER at the API boundary.
+  phone              String?
+  /// Sri Lankan NIC, uppercased (old: 9 digits + V/X, new: 12 digits).
+  /// Unique within the tenant. Required for the OWNER at the API boundary.
+  nic                String?
+  passwordHash       String
+  role               TenantRole
+  status             TenantUserStatus @default(ACTIVE)
+  /// True while the user holds a temporary password.
+  mustChangePassword Boolean          @default(true)
+  passwordChangedAt  DateTime?
+  lastLoginAt        DateTime?
+  disabledAt         DateTime?
+
+  /// Exactly one creator is set: a platform admin (e.g. the OWNER) or a
+  /// tenant user of the same tenant (staff).
+  createdByPlatformAdminId String?            @db.Uuid
+  createdByPlatformAdmin   PlatformAdminUser? @relation(fields: [createdByPlatformAdminId], references: [id], onDelete: Restrict)
+  createdByTenantUserId    String?            @db.Uuid
+  /// Composite FK guarantees the creating user belongs to the same tenant.
+  createdByTenantUser      TenantUser?        @relation("TenantUserCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
+  createdTenantUsers       TenantUser[]       @relation("TenantUserCreatedBy")
+
+  sessions        TenantUserSession[]
+  auditLogEntries TenantAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, email])
+  @@unique([tenantId, nic])
+  @@index([tenantId, role, status])
+  @@index([createdByPlatformAdminId])
+  @@map("tenant_users")
+}
+
+enum TenantSessionRevokedReason {
+  LOGOUT
+  ROTATED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  USER_DISABLED
+  EMAIL_CHANGED
+  TENANT_CLOSED
+  REFRESH_TOKEN_REUSE
+}
+
+/// One login session of a tenant user. Holds the hash of the current refresh
+/// token; each refresh rotates to a new session row.
+model TenantUserSession {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userId   String @db.Uuid
+  /// Composite FK guarantees the session's user belongs to the same tenant.
+  user     TenantUser @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Cascade)
+
+  /// SHA-256 hex of the opaque refresh token. The raw token is never stored.
+  refreshTokenHash String                      @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revokedReason    TenantSessionRevokedReason?
+  /// Session that replaced this one on refresh-token rotation.
+  replacedById     String?                     @db.Uuid
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime                    @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([tenantId, revokedAt])
+  @@map("tenant_user_sessions")
+}
+
+/// Append-only operational audit of a tenant: who did what inside the driving
+/// school. Separate from PlatformAuditLog. Rows are never updated or deleted
+/// (enforced by a database trigger).
+model TenantAuditLog {
+  id                String      @id @default(uuid()) @db.Uuid
+  tenantId          String      @db.Uuid
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  /// Null when there is no authenticated actor (e.g. failed login).
+  actorTenantUserId String?     @db.Uuid
+  /// Composite FK guarantees the actor belongs to the same tenant.
+  actor             TenantUser? @relation(fields: [tenantId, actorTenantUserId], references: [tenantId, id], onDelete: Restrict)
+  /// Code-defined TenantAuditAction value.
+  action            String
+  targetType        String?
+  targetId          String?
+  /// Changed fields / context only. Never secrets or password material.
+  metadata          Json?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime    @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, actorTenantUserId, createdAt])
+  @@index([tenantId, targetType, targetId, createdAt])
+  @@map("tenant_audit_logs")
 }

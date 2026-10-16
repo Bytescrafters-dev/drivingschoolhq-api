@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-drivingschoolhq}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - '${POSTGRES_PORT:-5433}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,25 +25,26 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
 
-  api:
-    build:
-      context: .
-      target: runtime
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?PLATFORM_JWT_SECRET must be set (min 32 chars)}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-drivingschoolhq}?schema=public
-    ports:
-      - "${API_PORT:-3000}:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
+  # api:
+  #   build:
+  #     context: .
+  #     target: runtime
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 8000
+  #     PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?PLATFORM_JWT_SECRET must be set (min 32 chars)}
+  #     TENANT_JWT_SECRET: ${TENANT_JWT_SECRET:?TENANT_JWT_SECRET must be set (min 32 chars)}
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-drivingschoolhq}?schema=public
+  #   ports:
+  #     - '${API_PORT:-8000}:8000'
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     migrate:
+  #       condition: service_completed_successfully
 
 volumes:
   pgdata:

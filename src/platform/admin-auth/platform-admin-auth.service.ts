@@ -7,7 +7,7 @@ import {
   PlatformSessionRevokedReason,
 } from '../../generated/prisma/enums.js';
 import { TransactionManager } from '../../prisma/transaction-manager.js';
-import { normalizeEmail } from '../admin-users/common/email.js';
+import { normalizeEmail } from '../../common/text/email.js';
 import {
   PLATFORM_ADMIN_USER_REPOSITORY,
   type PlatformAdmin,
@@ -19,7 +19,7 @@ import {
 } from '../audit/common/platform-audit-action.js';
 import { PlatformAuditService } from '../audit/platform-audit.service.js';
 import type { AuthenticatedPlatformAdmin } from './interfaces/authenticated-platform-admin.js';
-import { PasswordHasher } from './common/password-hasher.js';
+import { PasswordHasher } from '../../common/security/password-hasher.js';
 import {
   PLATFORM_SESSION_REPOSITORY,
   type PlatformSessionRepository,

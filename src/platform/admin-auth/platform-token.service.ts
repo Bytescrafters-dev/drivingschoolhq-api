@@ -1,8 +1,11 @@
-import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { Env } from '../../config/env.js';
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+} from '../../common/security/refresh-token.js';
 
 export const PLATFORM_TOKEN_AUDIENCE = 'platform';
 export const PLATFORM_TOKEN_ISSUER = 'drivingschoolhq';
@@ -57,11 +60,10 @@ export class PlatformTokenService {
   }
 
   generateRefreshToken(): { token: string; hash: string } {
-    const token = randomBytes(32).toString('base64url');
-    return { token, hash: this.hashRefreshToken(token) };
+    return generateRefreshToken();
   }
 
   hashRefreshToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
+    return hashRefreshToken(token);
   }
 }

@@ -39,10 +39,11 @@ describe('platform role permissions', () => {
     expect(roleHasPermissions(role, [P.PLANS_MANAGE])).toBe(false);
   });
 
-  it('lets BILLING_ADMIN handle invoices and payments but not tenant state', () => {
+  it('lets BILLING_ADMIN handle plans, invoices and payments but not tenant state', () => {
     const role = PlatformRole.BILLING_ADMIN;
     expect(
       roleHasPermissions(role, [
+        P.PLANS_MANAGE,
         P.INVOICES_MANAGE,
         P.PAYMENTS_RECORD,
         P.PAYMENTS_REVERSE,
