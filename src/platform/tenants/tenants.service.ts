@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import { PasswordHasher } from '../../common/security/password-hasher.js';
 import { normalizeSriLankanPhone } from '../../common/text/sri-lanka.js';
+import { DS_CODE_MESSAGE, normalizeDsCode } from './common/ds-code.js';
 import {
   type District,
   TenantAccessStatus,
@@ -314,13 +315,9 @@ function normalizeProfileChange(
 ): TenantProfileChange {
   const change: TenantProfileChange = {};
   if (input.dsCode !== undefined) {
-    const dsCode = input.dsCode.trim().toUpperCase();
+    const dsCode = normalizeDsCode(input.dsCode);
     if (!dsCode) {
-      throw new AppError(
-        'BAD_REQUEST',
-        'INVALID_DS_CODE',
-        'DS code is required',
-      );
+      throw new AppError('BAD_REQUEST', 'INVALID_DS_CODE', DS_CODE_MESSAGE);
     }
     change.dsCode = dsCode;
   }

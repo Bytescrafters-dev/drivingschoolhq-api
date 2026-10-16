@@ -55,8 +55,8 @@ describe('Tenant auth persistence (real database)', () => {
   }
 
   it("rejects sessions and audit entries that point at another tenant's user", async () => {
-    const a = await school('DS-A');
-    const b = await school('DS-B');
+    const a = await school('DS101');
+    const b = await school('DS102');
 
     await expect(
       prisma.tenantUserSession.create({
@@ -80,7 +80,7 @@ describe('Tenant auth persistence (real database)', () => {
   });
 
   it('keeps the tenant audit log append-only', async () => {
-    const { tenant } = await school('DS-A');
+    const { tenant } = await school('DS101');
     const entry = await prisma.tenantAuditLog.create({
       data: { tenantId: tenant.id, action: 'LOGIN_FAILED' },
     });
@@ -96,8 +96,8 @@ describe('Tenant auth persistence (real database)', () => {
   });
 
   it('lets exactly one of two concurrent refreshes of the same token win', async () => {
-    await school('DS-A');
-    const tokens = await auth.login('DS-A', 'owner@school.lk', PASSWORD, META);
+    await school('DS101');
+    const tokens = await auth.login('DS101', 'owner@school.lk', PASSWORD, META);
 
     const results = await Promise.allSettled([
       auth.refresh(tokens.refreshToken, META),
@@ -111,7 +111,7 @@ describe('Tenant auth persistence (real database)', () => {
   });
 
   it('ends owner sessions on platform password reset, disable and tenant close', async () => {
-    const { admin, tenant, owner } = await school('DS-A');
+    const { admin, tenant, owner } = await school('DS101');
     const actor = actorFrom(admin);
     const owners = moduleRef.get(TenantOwnerAdminService);
     const tenants = moduleRef.get(TenantsService);
@@ -127,17 +127,17 @@ describe('Tenant auth persistence (real database)', () => {
         })
       ).revokedReason;
 
-    await auth.login('DS-A', 'owner@school.lk', PASSWORD, META);
+    await auth.login('DS101', 'owner@school.lk', PASSWORD, META);
     await owners.resetPassword(actor, tenant.id, 'Reset-Temp-Pass-1', META);
     expect(await active()).toHaveLength(0);
     expect(await lastReason()).toBe('PASSWORD_RESET');
 
-    await auth.login('DS-A', 'owner@school.lk', 'Reset-Temp-Pass-1', META);
+    await auth.login('DS101', 'owner@school.lk', 'Reset-Temp-Pass-1', META);
     await owners.disable(actor, tenant.id, META);
     expect(await lastReason()).toBe('USER_DISABLED');
     await owners.enable(actor, tenant.id, META);
 
-    await auth.login('DS-A', 'owner@school.lk', 'Reset-Temp-Pass-1', META);
+    await auth.login('DS101', 'owner@school.lk', 'Reset-Temp-Pass-1', META);
     await tenants.close(actor, tenant.id, 'Closing', META);
     expect(await active()).toHaveLength(0);
     expect(await lastReason()).toBe('TENANT_CLOSED');

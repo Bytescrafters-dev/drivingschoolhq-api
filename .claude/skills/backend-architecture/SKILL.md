@@ -32,10 +32,13 @@ Controller → Application/Domain Service → Repository Interface
 
 - Controller: HTTP concerns, authenticated actor/context, DTO validation, service call, response mapping.
 - Service: use cases, domain rules, orchestration, transaction decisions.
-- Repository interface: persistence operations expressed in domain language, not Prisma's query API.
-- Repository implementation: owns Prisma calls and query mapping.
+- Repository interface: persistence operations expressed in domain language, not Prisma's query API. Always create inside a directory 'interfaces', inside the module.
+- Repository implementation: owns Prisma calls and query mapping. Always create inside a directory 'infra', inside the module.
 - Module: owns registration/exports of its public services and repository tokens.
 - Follow the actual repository layout instead of generating parallel abstractions.
+- Any other files created to include interfaces only, should be also created inside the 'interfaces' directory.
+- Any other supporting files should be placed inside a directory 'common' inside the module.
+- In the root level, there should be only module, service, and controller files and any corresponding tests.
 
 ## Non-negotiable domain boundaries
 

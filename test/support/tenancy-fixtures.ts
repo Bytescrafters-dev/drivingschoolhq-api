@@ -1,3 +1,4 @@
+import { randomDigits } from './random.js';
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../src/generated/prisma/client.js';
 import {
@@ -48,7 +49,7 @@ export async function createTenant(
 ) {
   return prisma.tenant.create({
     data: {
-      dsCode: overrides.dsCode ?? `DS${suffix()}`,
+      dsCode: overrides.dsCode ?? `DS${randomDigits()}`,
       name: 'Fixture Driving School (Pvt) Ltd',
       displayName: 'Fixture Driving School',
       address: '12 Galle Road, Colombo 03',

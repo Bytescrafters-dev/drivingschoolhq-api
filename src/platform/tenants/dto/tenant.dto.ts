@@ -32,6 +32,7 @@ import {
 import { ISO_DATE_PATTERN } from '../../../common/time/calendar-date.js';
 import { Trim } from '../../../common/validation/validation-pipe.js';
 import { LKR_AMOUNT_PATTERN } from '../../plans/common/money.js';
+import { DS_CODE_MESSAGE, DS_CODE_PATTERN } from '../common/ds-code.js';
 import { MAX_GRACE_PERIOD_DAYS } from '../../subscriptions/subscriptions.service.js';
 
 /** Normalises to +94XXXXXXXXX when possible; invalid input fails @Matches. */
@@ -54,9 +55,6 @@ const UpperTrim = () =>
 
 const PHONE_MESSAGE =
   'phone must be a valid Sri Lankan number, e.g. 0771234567 or +94771234567';
-const DS_CODE_PATTERN = /^[A-Z0-9][A-Z0-9/-]{0,29}$/;
-const DS_CODE_MESSAGE =
-  'dsCode must be 1-30 characters of letters, digits, "/" or "-"';
 
 export class TenantProfileDto {
   @UpperTrim()

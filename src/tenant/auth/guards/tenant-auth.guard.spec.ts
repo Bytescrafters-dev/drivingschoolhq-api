@@ -32,7 +32,7 @@ function context(
 
 async function setup(mustChangePassword = false) {
   const ctx = tenantAuthSetup();
-  const tenant = ctx.tenants.seed({ dsCode: 'DS-1' });
+  const tenant = ctx.tenants.seed({ dsCode: 'DS1' });
   const user = ctx.users.seedUser({
     tenantId: tenant.id,
     role: TenantRole.OWNER,
@@ -41,7 +41,7 @@ async function setup(mustChangePassword = false) {
     passwordHash: `hashed:${PASSWORD}`,
   });
   const { accessToken } = await ctx.service.login(
-    'DS-1',
+    'DS1',
     'owner@school.lk',
     PASSWORD,
     META,

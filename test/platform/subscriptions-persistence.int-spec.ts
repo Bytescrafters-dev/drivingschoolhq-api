@@ -42,7 +42,7 @@ describe('Subscription changes and renewal (real database)', () => {
 
   beforeEach(() => resetDatabase(prisma));
 
-  async function tenantWithScheduledChange(dsCode = 'DS-1') {
+  async function tenantWithScheduledChange(dsCode = 'DS1') {
     const admin = await createPlatformAdmin(prisma);
     const actor = actorFrom(admin);
     const plan = await createPricePlan(prisma, admin.id);

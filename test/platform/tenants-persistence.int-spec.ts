@@ -16,7 +16,7 @@ import {
   createPricePlan,
 } from '../support/tenancy-fixtures.js';
 
-function input(planPriceId: string, dsCode = 'DS-1'): CreateTenantInput {
+function input(planPriceId: string, dsCode = 'DS1'): CreateTenantInput {
   return {
     tenant: {
       dsCode,
@@ -104,8 +104,8 @@ describe('Tenants persistence (real database)', () => {
   it('lets only one of two concurrent creates with the same DS code win', async () => {
     const { actor, price } = await setup();
     const results = await Promise.allSettled([
-      service.createTenant(actor, input(price.id, 'DS-RACE'), META),
-      service.createTenant(actor, input(price.id, 'ds-race'), META),
+      service.createTenant(actor, input(price.id, 'DS777'), META),
+      service.createTenant(actor, input(price.id, 'ds777'), META),
     ]);
     const rejected = results.filter(
       (r): r is PromiseRejectedResult => r.status === 'rejected',

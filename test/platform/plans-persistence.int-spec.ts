@@ -174,7 +174,7 @@ describe('Plans persistence (real database)', () => {
     );
     const tenant = await prisma.tenant.create({
       data: {
-        dsCode: 'DS-1',
+        dsCode: 'DS1',
         name: 'School',
         displayName: 'School',
         address: 'Colombo',

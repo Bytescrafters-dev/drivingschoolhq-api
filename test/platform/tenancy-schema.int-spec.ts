@@ -85,15 +85,17 @@ describe('Plans, tenants and subscriptions schema invariants (real database)', (
   });
 
   describe('tenants', () => {
-    it('requires a unique, normalised DS code', async () => {
-      await createTenant(prisma, adminId, { dsCode: 'DS-0001' });
+    it('requires a unique DS code of the form "DS" + digits', async () => {
+      await createTenant(prisma, adminId, { dsCode: 'DS0001' });
 
       await expect(
-        createTenant(prisma, adminId, { dsCode: 'DS-0001' }),
+        createTenant(prisma, adminId, { dsCode: 'DS0001' }),
       ).rejects.toThrow();
-      await expect(
-        createTenant(prisma, adminId, { dsCode: ' ds-0002' }),
-      ).rejects.toThrow(/tenants_ds_code_normalised_chk/);
+      for (const dsCode of [' DS0002', 'ds0002', 'DS-0002', 'XY0002', 'DS']) {
+        await expect(createTenant(prisma, adminId, { dsCode })).rejects.toThrow(
+          /tenants_ds_code_format_chk/,
+        );
+      }
     });
 
     it('cannot be deleted while it has users', async () => {

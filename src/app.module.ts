@@ -24,10 +24,8 @@ import { TenantModule } from './tenant/tenant.module.js';
       useFactory: (config: ConfigService<Env, true>) => ({
         throttlers: [
           {
-            ttl:
-              config.get('PLATFORM_AUTH_RATE_WINDOW_SECONDS', { infer: true }) *
-              1000,
-            limit: config.get('PLATFORM_AUTH_RATE_LIMIT', { infer: true }),
+            ttl: config.get('AUTH_RATE_WINDOW_SECONDS', { infer: true }) * 1000,
+            limit: config.get('AUTH_RATE_LIMIT', { infer: true }),
           },
         ],
       }),

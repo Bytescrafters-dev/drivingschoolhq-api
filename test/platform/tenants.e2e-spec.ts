@@ -68,7 +68,7 @@ describe('Platform tenants (e2e)', () => {
   function body(planPriceId: string, overrides: Record<string, unknown> = {}) {
     return {
       tenant: {
-        dsCode: 'ds-0001',
+        dsCode: 'ds0001',
         name: 'Lanka Driving School (Pvt) Ltd',
         displayName: 'Lanka DS',
         address: '12 Galle Road, Colombo 03',
@@ -109,7 +109,7 @@ describe('Platform tenants (e2e)', () => {
     const tenantId = created.body.id as string;
 
     expect(created.body).toMatchObject({
-      dsCode: 'DS-0001',
+      dsCode: 'DS0001',
       phone: '+94112345678',
       district: 'COLOMBO',
       status: 'ACTIVE',
@@ -205,7 +205,7 @@ describe('Platform tenants (e2e)', () => {
     const second = body(price.id);
     second.tenant = {
       ...second.tenant,
-      dsCode: 'DS-0002',
+      dsCode: 'DS0002',
       name: 'Kandy Drivers',
       displayName: 'Kandy',
       district: 'KANDY',
@@ -222,17 +222,17 @@ describe('Platform tenants (e2e)', () => {
       .expect(200);
     expect(res.body.total).toBe(1);
     expect(res.body.items[0]).toMatchObject({
-      dsCode: 'DS-0002',
+      dsCode: 'DS0002',
       accessStatus: 'ACTIVE',
       currentPlan: { planName: 'Fixture Plan', billingPeriod: 'MONTHLY' },
     });
 
     const search = await http()
-      .get('/platform/tenants?search=ds-0001')
+      .get('/platform/tenants?search=ds0001')
       .set(bearer(token))
       .expect(200);
     expect(search.body.items.map((t: { dsCode: string }) => t.dsCode)).toEqual([
-      'DS-0001',
+      'DS0001',
     ]);
   });
 
@@ -252,7 +252,7 @@ describe('Platform tenants (e2e)', () => {
       .expect(({ body: res }) => expect(res.code).toBe('TENANT_DS_CODE_TAKEN'));
 
     const other = body(price.id);
-    other.tenant = { ...other.tenant, dsCode: 'DS-0002' };
+    other.tenant = { ...other.tenant, dsCode: 'DS0002' };
     await http()
       .post('/platform/tenants')
       .set(bearer(token))
@@ -262,7 +262,7 @@ describe('Platform tenants (e2e)', () => {
     await http()
       .patch(`/platform/tenants/${first.body.id}`)
       .set(bearer(token))
-      .send({ dsCode: 'ds-0002' })
+      .send({ dsCode: 'ds0002' })
       .expect(409)
       .expect(({ body: res }) => expect(res.code).toBe('TENANT_DS_CODE_TAKEN'));
     expect(await prisma.tenant.count()).toBe(2);
@@ -299,6 +299,11 @@ describe('Platform tenants (e2e)', () => {
     [
       'invalid tenant phone',
       { tenant: { phone: '+1 202 555 0100' } },
+      'VALIDATION_FAILED',
+    ],
+    [
+      'malformed DS code',
+      { tenant: { dsCode: 'DS-119' } },
       'VALIDATION_FAILED',
     ],
     [

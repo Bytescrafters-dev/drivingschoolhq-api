@@ -1,3 +1,4 @@
+import { randomDigits } from './random.js';
 import { randomUUID } from 'node:crypto';
 import { JwtService } from '@nestjs/jwt';
 import type { ConfigService } from '@nestjs/config';
@@ -34,7 +35,7 @@ export class InMemoryTenantContextRepository implements TenantContextRepository 
   seed(overrides: Partial<TenantContext> = {}): TenantContext {
     const tenant: TenantContext = {
       id: randomUUID(),
-      dsCode: `DS${randomUUID().slice(0, 6).toUpperCase()}`,
+      dsCode: `DS${randomDigits()}`,
       displayName: 'School',
       status: TenantStatus.ACTIVE,
       accessStatus: TenantAccessStatus.ACTIVE,

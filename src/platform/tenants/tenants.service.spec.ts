@@ -12,7 +12,7 @@ import type { CreateTenantInput } from './tenants.service.js';
 function createInput(planPriceId: string): CreateTenantInput {
   return {
     tenant: {
-      dsCode: ' ds-0001 ',
+      dsCode: ' ds0001 ',
       name: ' Lanka Driving School (Pvt) Ltd ',
       displayName: 'Lanka DS',
       address: '12 Galle Road, Colombo 03',
@@ -44,7 +44,7 @@ describe('TenantsService', () => {
       );
 
       expect(details.tenant).toMatchObject({
-        dsCode: 'DS-0001',
+        dsCode: 'DS0001',
         name: 'Lanka Driving School (Pvt) Ltd',
         phone: '+94112345678',
         status: TenantStatus.ACTIVE,
@@ -84,7 +84,7 @@ describe('TenantsService', () => {
     it('rejects a duplicate DS code', async () => {
       const { service, actor, subscribablePrice, tenants } = tenancySetup();
       const { price } = subscribablePrice();
-      tenants.seed({ dsCode: 'DS-0001' });
+      tenants.seed({ dsCode: 'DS0001' });
       await expectAppError(
         service.createTenant(actor, createInput(price.id), META),
         'TENANT_DS_CODE_TAKEN',
@@ -134,17 +134,17 @@ describe('TenantsService', () => {
       const details = await service.updateProfile(
         actor,
         tenant.id,
-        { displayName: 'New', phone: '0771234567', dsCode: 'ds-9' },
+        { displayName: 'New', phone: '0771234567', dsCode: 'ds9' },
         META,
       );
 
       expect(details.tenant).toMatchObject({
         displayName: 'New',
-        dsCode: 'DS-9',
+        dsCode: 'DS9',
       });
       expect(audit.entries[0]!.metadata).toEqual({
         displayName: { from: 'Old', to: 'New' },
-        dsCode: { from: tenant.dsCode, to: 'DS-9' },
+        dsCode: { from: tenant.dsCode, to: 'DS9' },
       });
     });
 
@@ -270,4 +270,30 @@ describe('TenantsService', () => {
       );
     });
   });
+});
+
+describe('DS code format', () => {
+  it.each(['DS119', 'ds1234', ' DS0001 '])('accepts %s', async (dsCode) => {
+    const { service, actor, tenants } = tenancySetup();
+    const tenant = tenants.seed();
+    const details = await service.updateProfile(
+      actor,
+      tenant.id,
+      { dsCode },
+      META,
+    );
+    expect(details.tenant.dsCode).toBe(dsCode.trim().toUpperCase());
+  });
+
+  it.each(['DS-119', 'XY119', 'DS', 'DS12A', '119'])(
+    'rejects %s',
+    async (dsCode) => {
+      const { service, actor, tenants } = tenancySetup();
+      const tenant = tenants.seed();
+      await expectAppError(
+        service.updateProfile(actor, tenant.id, { dsCode }, META),
+        'INVALID_DS_CODE',
+      );
+    },
+  );
 });

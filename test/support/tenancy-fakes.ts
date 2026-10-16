@@ -1,3 +1,4 @@
+import { randomDigits } from './random.js';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../../src/common/errors/app-error.js';
 import {
@@ -38,7 +39,7 @@ export class InMemoryTenantRepository implements TenantRepository {
     const now = new Date('2026-01-01T00:00:00.000Z');
     const tenant: Tenant = {
       id: randomUUID(),
-      dsCode: `DS${randomUUID().slice(0, 6).toUpperCase()}`,
+      dsCode: `DS${randomDigits()}`,
       name: 'Seeded School',
       displayName: 'Seeded',
       address: 'Colombo',

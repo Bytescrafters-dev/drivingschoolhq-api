@@ -21,7 +21,7 @@ function withUser(
 ) {
   const ctx = tenantAuthSetup();
   const tenant = ctx.tenants.seed({
-    dsCode: 'DS-1',
+    dsCode: 'DS1',
     status: overrides.tenantStatus ?? TenantStatus.ACTIVE,
     accessStatus: overrides.accessStatus ?? TenantAccessStatus.ACTIVE,
   });
@@ -58,7 +58,7 @@ describe('TenantAuthService', () => {
         withUser();
 
       const result = await service.login(
-        ' ds-1 ',
+        ' ds1 ',
         ' Owner@School.LK ',
         PASSWORD,
         META,
@@ -90,14 +90,14 @@ describe('TenantAuthService', () => {
         accessStatus: TenantAccessStatus.SUSPENDED,
       });
       await expect(
-        service.login('DS-1', 'owner@school.lk', PASSWORD, META),
+        service.login('DS1', 'owner@school.lk', PASSWORD, META),
       ).resolves.toMatchObject({ tokenType: 'Bearer' });
     });
 
     it('burns hash time and writes no tenant audit for an unknown DS code', async () => {
       const { service, hasher, auditRepo } = withUser();
       await expectAppError(
-        service.login('DS-404', 'owner@school.lk', PASSWORD, META),
+        service.login('DS404', 'owner@school.lk', PASSWORD, META),
         'INVALID_CREDENTIALS',
       );
       expect(hasher.dummyVerifications).toBe(1);
@@ -107,7 +107,7 @@ describe('TenantAuthService', () => {
     it('burns hash time and audits an unknown email', async () => {
       const { service, hasher, auditRepo, tenant } = withUser();
       await expectAppError(
-        service.login('DS-1', 'nobody@school.lk', PASSWORD, META),
+        service.login('DS1', 'nobody@school.lk', PASSWORD, META),
         'INVALID_CREDENTIALS',
       );
       expect(hasher.dummyVerifications).toBe(1);
@@ -121,9 +121,9 @@ describe('TenantAuthService', () => {
 
     it('does not find a user through another school', async () => {
       const { service, tenants } = withUser();
-      tenants.seed({ dsCode: 'DS-2' });
+      tenants.seed({ dsCode: 'DS2' });
       await expectAppError(
-        service.login('DS-2', 'owner@school.lk', PASSWORD, META),
+        service.login('DS2', 'owner@school.lk', PASSWORD, META),
         'INVALID_CREDENTIALS',
       );
     });
@@ -141,7 +141,7 @@ describe('TenantAuthService', () => {
       async (_label, overrides, password, reason) => {
         const { service, auditRepo, sessions } = withUser(overrides);
         await expectAppError(
-          service.login('DS-1', 'owner@school.lk', password, META),
+          service.login('DS1', 'owner@school.lk', password, META),
           'INVALID_CREDENTIALS',
         );
         expect(auditRepo.entries[0]!.metadata).toMatchObject({ reason });
@@ -152,11 +152,11 @@ describe('TenantAuthService', () => {
     it('reveals a closed school only after the password is verified', async () => {
       const closed = withUser({ tenantStatus: TenantStatus.CLOSED });
       await expectAppError(
-        closed.service.login('DS-1', 'owner@school.lk', 'wrong', META),
+        closed.service.login('DS1', 'owner@school.lk', 'wrong', META),
         'INVALID_CREDENTIALS',
       );
       await expectAppError(
-        closed.service.login('DS-1', 'owner@school.lk', PASSWORD, META),
+        closed.service.login('DS1', 'owner@school.lk', PASSWORD, META),
         'TENANT_CLOSED',
       );
       expect(closed.sessions.rows).toHaveLength(0);
@@ -165,9 +165,9 @@ describe('TenantAuthService', () => {
     it('never writes the password to the audit log', async () => {
       const { service, auditRepo } = withUser();
       await service
-        .login('DS-1', 'owner@school.lk', 'Secret-Wrong-1', META)
+        .login('DS1', 'owner@school.lk', 'Secret-Wrong-1', META)
         .catch(() => undefined);
-      await service.login('DS-1', 'owner@school.lk', PASSWORD, META);
+      await service.login('DS1', 'owner@school.lk', PASSWORD, META);
       const serialized = JSON.stringify(auditRepo.entries);
       expect(serialized).not.toContain(PASSWORD);
       expect(serialized).not.toContain('Secret-Wrong-1');
@@ -178,7 +178,7 @@ describe('TenantAuthService', () => {
     it('rotates the refresh token', async () => {
       const { service, sessions, user } = withUser();
       const first = await service.login(
-        'DS-1',
+        'DS1',
         'owner@school.lk',
         PASSWORD,
         META,
@@ -197,7 +197,7 @@ describe('TenantAuthService', () => {
     it('revokes every session of the user when a rotated token is reused', async () => {
       const { service, sessions, user, auditRepo } = withUser();
       const first = await service.login(
-        'DS-1',
+        'DS1',
         'owner@school.lk',
         PASSWORD,
         META,
@@ -216,8 +216,8 @@ describe('TenantAuthService', () => {
 
     it('refuses to refresh once the school is closed or the user disabled', async () => {
       const { service, tenants, users, tenant } = withUser();
-      const a = await service.login('DS-1', 'owner@school.lk', PASSWORD, META);
-      const b = await service.login('DS-1', 'owner@school.lk', PASSWORD, META);
+      const a = await service.login('DS1', 'owner@school.lk', PASSWORD, META);
+      const b = await service.login('DS1', 'owner@school.lk', PASSWORD, META);
 
       tenants.rows.find((t) => t.id === tenant.id)!.status =
         TenantStatus.CLOSED;
@@ -240,12 +240,12 @@ describe('TenantAuthService', () => {
     it('sets the new password, clears the temporary flag and signs out other sessions', async () => {
       const { service, sessions, users, user, auditRepo } = withUser();
       const current = await service.login(
-        'DS-1',
+        'DS1',
         'owner@school.lk',
         PASSWORD,
         META,
       );
-      await service.login('DS-1', 'owner@school.lk', PASSWORD, META);
+      await service.login('DS1', 'owner@school.lk', PASSWORD, META);
       const currentSessionId = sessions.rows[0]!.id;
 
       await service.changePassword(

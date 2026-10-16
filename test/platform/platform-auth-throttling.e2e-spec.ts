@@ -6,7 +6,7 @@ import { createTestPrisma, resetDatabase } from '../support/database.js';
 
 // Env is validated once when AppModule is first imported, so set the limit
 // before the dynamic import below (Vitest isolates modules per test file).
-process.env.PLATFORM_AUTH_RATE_LIMIT = '3';
+process.env.AUTH_RATE_LIMIT = '3';
 
 describe('Platform auth rate limiting (e2e)', () => {
   let app: INestApplication;

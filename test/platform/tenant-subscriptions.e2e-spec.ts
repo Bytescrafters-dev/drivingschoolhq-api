@@ -60,7 +60,7 @@ describe('Tenant subscriptions (e2e)', () => {
       .set(bearer(token))
       .send({
         tenant: {
-          dsCode: 'DS-1',
+          dsCode: 'DS1',
           name: 'School',
           displayName: 'School',
           address: 'Colombo',

@@ -82,9 +82,9 @@ describe('Tenant user authentication (e2e)', () => {
     http().post('/tenant/auth/login').send({ dsCode, email, password });
 
   it('owner signs in with a temporary password, must change it, then uses the session', async () => {
-    const tenantId = await onboard('DS-1');
+    const tenantId = await onboard('DS1');
 
-    const first = await login('ds-1', 'Owner@School.lk', TEMP).expect(200);
+    const first = await login('ds1', 'Owner@School.lk', TEMP).expect(200);
     expect(first.body).toMatchObject({
       tokenType: 'Bearer',
       mustChangePassword: true,
@@ -101,7 +101,7 @@ describe('Tenant user authentication (e2e)', () => {
         role: 'OWNER',
         mustChangePassword: true,
       },
-      tenant: { id: tenantId, dsCode: 'DS-1', accessStatus: 'ACTIVE' },
+      tenant: { id: tenantId, dsCode: 'DS1', accessStatus: 'ACTIVE' },
     });
 
     await http()
@@ -109,9 +109,9 @@ describe('Tenant user authentication (e2e)', () => {
       .set(bearer(temp))
       .send({ currentPassword: TEMP, newPassword: 'Owner-Real-Pass-1' })
       .expect(204);
-    await login('DS-1', 'owner@school.lk', TEMP).expect(401);
+    await login('DS1', 'owner@school.lk', TEMP).expect(401);
     const real = await login(
-      'DS-1',
+      'DS1',
       'owner@school.lk',
       'Owner-Real-Pass-1',
     ).expect(200);
@@ -146,10 +146,10 @@ describe('Tenant user authentication (e2e)', () => {
   });
 
   it('uses the DS code to pick the right school when the same email exists in two', async () => {
-    const a = await onboard('DS-A');
-    const b = await onboard('DS-B');
+    const a = await onboard('DS101');
+    const b = await onboard('DS102');
 
-    const res = await login('DS-B', 'owner@school.lk', TEMP).expect(200);
+    const res = await login('DS102', 'owner@school.lk', TEMP).expect(200);
     const me = await http()
       .get('/tenant/auth/me')
       .set(bearer(res.body.accessToken))
@@ -159,11 +159,11 @@ describe('Tenant user authentication (e2e)', () => {
   });
 
   it('returns the same error for an unknown school, unknown email and wrong password', async () => {
-    await onboard('DS-1');
+    await onboard('DS1');
     const attempts: [string, string, string][] = [
-      ['DS-404', 'owner@school.lk', TEMP],
-      ['DS-1', 'nobody@school.lk', TEMP],
-      ['DS-1', 'owner@school.lk', 'Wrong-Password-1'],
+      ['DS404', 'owner@school.lk', TEMP],
+      ['DS1', 'nobody@school.lk', TEMP],
+      ['DS1', 'owner@school.lk', 'Wrong-Password-1'],
     ];
     for (const [ds, email, pw] of attempts) {
       await login(ds, email, pw)
@@ -173,9 +173,9 @@ describe('Tenant user authentication (e2e)', () => {
   });
 
   it('keeps platform and tenant tokens apart', async () => {
-    await onboard('DS-1');
+    await onboard('DS1');
     const tenantToken = (
-      await login('DS-1', 'owner@school.lk', TEMP).expect(200)
+      await login('DS1', 'owner@school.lk', TEMP).expect(200)
     ).body.accessToken;
 
     await http().get('/tenant/auth/me').set(bearer(adminToken)).expect(401);
@@ -184,9 +184,9 @@ describe('Tenant user authentication (e2e)', () => {
   });
 
   it('platform actions end tenant sessions immediately', async () => {
-    const tenantId = await onboard('DS-1');
+    const tenantId = await onboard('DS1');
     const token = async (password = TEMP) =>
-      (await login('DS-1', 'owner@school.lk', password).expect(200)).body
+      (await login('DS1', 'owner@school.lk', password).expect(200)).body
         .accessToken as string;
     const me = (t: string) => http().get('/tenant/auth/me').set(bearer(t));
 
@@ -196,7 +196,7 @@ describe('Tenant user authentication (e2e)', () => {
       .set(bearer(adminToken))
       .expect(200);
     await me(t).expect(401);
-    await login('DS-1', 'owner@school.lk', TEMP).expect(401);
+    await login('DS1', 'owner@school.lk', TEMP).expect(401);
     await http()
       .post(`/platform/tenants/${tenantId}/owner/enable`)
       .set(bearer(adminToken))
@@ -209,7 +209,7 @@ describe('Tenant user authentication (e2e)', () => {
       .send({ temporaryPassword: 'Second-Temp-Pass-1' })
       .expect(200);
     await me(t).expect(401);
-    await login('DS-1', 'owner@school.lk', TEMP).expect(401);
+    await login('DS1', 'owner@school.lk', TEMP).expect(401);
 
     t = await token('Second-Temp-Pass-1');
     await http()
@@ -218,18 +218,18 @@ describe('Tenant user authentication (e2e)', () => {
       .send({ reason: 'Closed' })
       .expect(200);
     await me(t).expect(401);
-    await login('DS-1', 'owner@school.lk', 'Second-Temp-Pass-1')
+    await login('DS1', 'owner@school.lk', 'Second-Temp-Pass-1')
       .expect(403)
       .expect(({ body }) => expect(body.code).toBe('TENANT_CLOSED'));
   });
 
   it('lets a suspended school sign in and see its access status', async () => {
-    const tenantId = await onboard('DS-1');
+    const tenantId = await onboard('DS1');
     await prisma.tenantAccess.update({
       where: { tenantId },
       data: { status: 'SUSPENDED' },
     });
-    const res = await login('DS-1', 'owner@school.lk', TEMP).expect(200);
+    const res = await login('DS1', 'owner@school.lk', TEMP).expect(200);
     await http()
       .get('/tenant/auth/me')
       .set(bearer(res.body.accessToken))
@@ -244,7 +244,7 @@ describe('Tenant user authentication (e2e)', () => {
       .expect(400);
     await http()
       .post('/tenant/auth/login')
-      .send({ dsCode: 'DS-1', email: 'not-an-email', password: TEMP })
+      .send({ dsCode: 'DS1', email: 'not-an-email', password: TEMP })
       .expect(400);
   });
 });

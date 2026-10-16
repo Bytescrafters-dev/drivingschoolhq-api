@@ -288,7 +288,8 @@ enum TenantStatus {
 /// One driving school using the SaaS. Never hard-deleted: CLOSED instead.
 model Tenant {
   id          String       @id @default(uuid()) @db.Uuid
-  /// Government-issued driving school code. Normalised (trimmed, uppercased).
+  /// Government-issued driving school code: "DS" + digits (e.g. DS119),
+  /// uppercased. Format enforced by a DB CHECK.
   /// Also the tenant identifier used at tenant-user login.
   dsCode      String       @unique
   /// Legal / registered name.

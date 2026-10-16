@@ -6,8 +6,8 @@ export interface Env {
   TENANT_JWT_SECRET: string;
   TENANT_ACCESS_TOKEN_TTL_SECONDS: number;
   TENANT_REFRESH_TOKEN_TTL_DAYS: number;
-  PLATFORM_AUTH_RATE_LIMIT: number;
-  PLATFORM_AUTH_RATE_WINDOW_SECONDS: number;
+  AUTH_RATE_LIMIT: number;
+  AUTH_RATE_WINDOW_SECONDS: number;
   /** Background jobs (e.g. subscription renewal). Disabled in tests. */
   JOBS_ENABLED: boolean;
 }
@@ -81,14 +81,10 @@ export function validateEnv(raw: Record<string, unknown>): Env {
       'TENANT_REFRESH_TOKEN_TTL_DAYS',
       7,
     ),
-    PLATFORM_AUTH_RATE_LIMIT: positiveInt(
-      raw.PLATFORM_AUTH_RATE_LIMIT,
-      'PLATFORM_AUTH_RATE_LIMIT',
-      5,
-    ),
-    PLATFORM_AUTH_RATE_WINDOW_SECONDS: positiveInt(
-      raw.PLATFORM_AUTH_RATE_WINDOW_SECONDS,
-      'PLATFORM_AUTH_RATE_WINDOW_SECONDS',
+    AUTH_RATE_LIMIT: positiveInt(raw.AUTH_RATE_LIMIT, 'AUTH_RATE_LIMIT', 5),
+    AUTH_RATE_WINDOW_SECONDS: positiveInt(
+      raw.AUTH_RATE_WINDOW_SECONDS,
+      'AUTH_RATE_WINDOW_SECONDS',
       60,
     ),
     JOBS_ENABLED: bool(raw.JOBS_ENABLED, 'JOBS_ENABLED', true),
