@@ -112,7 +112,7 @@ export class SubscriptionsService {
       });
       await this.audited(
         actor.id,
-        subscription.id,
+        subscription,
         PlatformAuditAction.SUBSCRIPTION_CREATED,
         meta,
         {
@@ -171,7 +171,7 @@ export class SubscriptionsService {
       });
       await this.audited(
         actor.id,
-        created.id,
+        created,
         PlatformAuditAction.SUBSCRIPTION_CHANGE_SCHEDULED,
         meta,
         {
@@ -227,11 +227,10 @@ export class SubscriptionsService {
       );
       await this.audited(
         actor.id,
-        active.id,
+        active,
         PlatformAuditAction.SUBSCRIPTION_GRACE_PERIOD_CHANGED,
         meta,
         {
-          tenantId,
           gracePeriodDays: {
             from: previous,
             to: gracePeriodDays,
@@ -261,10 +260,10 @@ export class SubscriptionsService {
         await this.subscriptions.end(active.id, endDate);
         await this.audited(
           actor.id,
-          active.id,
+          active,
           PlatformAuditAction.SUBSCRIPTION_ENDED,
           meta,
-          { tenantId, endDate: toIsoDate(endDate), reason },
+          { endDate: toIsoDate(endDate), reason },
         );
       }
       if (scheduled) await this.cancelRow(actor, scheduled, reason, meta);
@@ -294,11 +293,10 @@ export class SubscriptionsService {
         await this.subscriptions.end(active.id, endDate);
         await this.audited(
           null,
-          active.id,
+          active,
           PlatformAuditAction.SUBSCRIPTION_ENDED,
           SYSTEM_META,
           {
-            tenantId,
             endDate: toIsoDate(endDate),
             reason: 'Replaced by scheduled change',
           },
@@ -307,10 +305,10 @@ export class SubscriptionsService {
       await this.subscriptions.activate(scheduled.id);
       await this.audited(
         null,
-        scheduled.id,
+        scheduled,
         PlatformAuditAction.SUBSCRIPTION_ACTIVATED,
         SYSTEM_META,
-        { tenantId, previousSubscriptionId: active?.id ?? null },
+        { previousSubscriptionId: active?.id ?? null },
       );
       return true;
     });
@@ -363,16 +361,16 @@ export class SubscriptionsService {
     });
     await this.audited(
       actor.id,
-      subscription.id,
+      subscription,
       PlatformAuditAction.SUBSCRIPTION_CANCELLED,
       meta,
-      { tenantId: subscription.tenantId, reason },
+      { reason },
     );
   }
 
   private audited(
     actorAdminId: string | null,
-    subscriptionId: string,
+    subscription: Pick<TenantSubscription, 'id' | 'tenantId'>,
     action: PlatformAuditAction,
     meta: RequestMeta,
     metadata: AuditMetadata,
@@ -382,8 +380,9 @@ export class SubscriptionsService {
       action,
       target: {
         type: PlatformAuditTarget.TENANT_SUBSCRIPTION,
-        id: subscriptionId,
+        id: subscription.id,
       },
+      tenantId: subscription.tenantId,
       metadata,
       meta,
     });
@@ -392,7 +391,6 @@ export class SubscriptionsService {
 
 function auditTerms(subscription: TenantSubscription): AuditMetadata {
   return {
-    tenantId: subscription.tenantId,
     planCode: subscription.planCode,
     billingPeriod: subscription.billingPeriod,
     listAmount: subscription.listAmount,

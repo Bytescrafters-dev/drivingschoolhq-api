@@ -20,6 +20,7 @@ export class PrismaPlatformAuditRepository implements PlatformAuditRepository {
         action: entry.action,
         targetType: entry.targetType,
         targetId: entry.targetId,
+        tenantId: entry.tenantId,
         metadata: (entry.metadata ?? undefined) as
           Prisma.InputJsonValue | undefined,
         ipAddress: entry.ipAddress,
@@ -38,6 +39,7 @@ export class PrismaPlatformAuditRepository implements PlatformAuditRepository {
       action: filter.action,
       targetType: filter.targetType,
       targetId: filter.targetId,
+      tenantId: filter.tenantId,
       createdAt:
         filter.from || filter.to
           ? { gte: filter.from, lte: filter.to }

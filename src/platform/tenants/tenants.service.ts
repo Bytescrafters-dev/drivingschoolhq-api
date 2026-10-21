@@ -141,7 +141,6 @@ export class TenantsService {
       await this.tenants.createAccess(tenant.id, this.clock.now());
       await this.audited(
         actor,
-        PlatformAuditTarget.TENANT,
         tenant.id,
         PlatformAuditAction.TENANT_CREATED,
         meta,
@@ -170,11 +169,11 @@ export class TenantsService {
       // Identity details stay out of the audit log; email identifies the owner.
       await this.audited(
         actor,
-        PlatformAuditTarget.TENANT_USER,
-        owner.id,
+        tenant.id,
         PlatformAuditAction.TENANT_OWNER_CREATED,
         meta,
-        { tenantId: tenant.id, email: owner.email },
+        { email: owner.email },
+        { type: PlatformAuditTarget.TENANT_USER, id: owner.id },
       );
       return tenant.id;
     });
@@ -202,7 +201,6 @@ export class TenantsService {
       await this.tenants.updateProfile(id, next);
       await this.audited(
         actor,
-        PlatformAuditTarget.TENANT,
         id,
         PlatformAuditAction.TENANT_UPDATED,
         meta,
@@ -234,14 +232,9 @@ export class TenantsService {
         id,
         TenantSessionRevokedReason.TENANT_CLOSED,
       );
-      await this.audited(
-        actor,
-        PlatformAuditTarget.TENANT,
-        id,
-        PlatformAuditAction.TENANT_CLOSED,
-        meta,
-        { reason: closeReason },
-      );
+      await this.audited(actor, id, PlatformAuditAction.TENANT_CLOSED, meta, {
+        reason: closeReason,
+      });
     });
     return this.get(id);
   }
@@ -269,14 +262,9 @@ export class TenantsService {
       } else if (access.status !== TenantAccessStatus.ACTIVE) {
         await this.tenants.setAccessStatus(id, TenantAccessStatus.ACTIVE, now);
       }
-      await this.audited(
-        actor,
-        PlatformAuditTarget.TENANT,
-        id,
-        PlatformAuditAction.TENANT_REOPENED,
-        meta,
-        { accessStatus: { from: access?.status ?? null, to: 'ACTIVE' } },
-      );
+      await this.audited(actor, id, PlatformAuditAction.TENANT_REOPENED, meta, {
+        accessStatus: { from: access?.status ?? null, to: 'ACTIVE' },
+      });
       await this.subscriptions.startSubscription(actor, id, terms, meta);
     });
     return this.get(id);
@@ -288,18 +276,23 @@ export class TenantsService {
     return tenant;
   }
 
+  /** Audits an action on the tenant (or, when given, on one of its records). */
   private audited(
     actor: AuthenticatedPlatformAdmin,
-    targetType: PlatformAuditTarget,
-    targetId: string,
+    tenantId: string,
     action: PlatformAuditAction,
     meta: RequestMeta,
     metadata: AuditMetadata,
+    target: { type: PlatformAuditTarget; id: string } = {
+      type: PlatformAuditTarget.TENANT,
+      id: tenantId,
+    },
   ): Promise<void> {
     return this.audit.record({
       actorAdminId: actor.id,
       action,
-      target: { type: targetType, id: targetId },
+      target,
+      tenantId,
       metadata,
       meta,
     });

@@ -69,6 +69,16 @@ describe('TenantsService', () => {
         PlatformAuditAction.SUBSCRIPTION_CREATED,
         PlatformAuditAction.TENANT_OWNER_CREATED,
       ]);
+      // Every entry is attributed to the tenant so it can be filtered by tenant.
+      expect(audit.entries.map((e) => e.tenantId)).toEqual([
+        details.tenant.id,
+        details.tenant.id,
+        details.tenant.id,
+      ]);
+      expect(audit.entries[2]).toMatchObject({
+        target: { type: 'TENANT_USER', id: details.owner!.id },
+        metadata: { email: details.owner!.email },
+      });
     });
 
     it('never writes the password or NIC to the audit log', async () => {
@@ -205,6 +215,9 @@ describe('TenantsService', () => {
         PlatformAuditAction.TENANT_CLOSED,
       ]);
       expect(audit.entries[1]!.metadata).toEqual({ reason: 'Contract ended' });
+      expect(audit.entries.every((e) => e.tenantId === created.tenant.id)).toBe(
+        true,
+      );
       expect(tenantSessions.revocations).toEqual([
         { tenantId: created.tenant.id, userId: null, reason: 'TENANT_CLOSED' },
       ]);

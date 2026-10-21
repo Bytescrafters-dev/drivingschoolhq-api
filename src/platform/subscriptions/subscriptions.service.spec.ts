@@ -407,6 +407,8 @@ describe('SubscriptionsService plan changes', () => {
     expect(active.gracePeriodDays).toBe(14);
     expect(audit.entries[0]).toMatchObject({
       action: PlatformAuditAction.SUBSCRIPTION_GRACE_PERIOD_CHANGED,
+      target: { type: 'TENANT_SUBSCRIPTION', id: active.id },
+      tenantId,
       metadata: { gracePeriodDays: { from: 10, to: 14 } },
     });
   });

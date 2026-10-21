@@ -111,6 +111,10 @@ model PlatformAuditLog {
   action       String
   targetType   String?
   targetId     String?
+  /// Tenant the action concerns (required for TENANT, TENANT_SUBSCRIPTION and
+  /// TENANT_USER targets; enforced by a CHECK). Lets admins filter by tenant.
+  tenantId     String?            @db.Uuid
+  tenant       Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   /// Changed fields / context only. Never secrets or password material.
   metadata     Json?
   ipAddress    String?
@@ -121,6 +125,7 @@ model PlatformAuditLog {
   @@index([actorAdminId, createdAt])
   @@index([targetType, targetId, createdAt])
   @@index([action, createdAt])
+  @@index([tenantId, createdAt])
   @@map("platform_audit_logs")
 }
 
@@ -305,11 +310,12 @@ model Tenant {
   createdById String            @db.Uuid
   createdBy   PlatformAdminUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
-  subscriptions TenantSubscription[]
-  access        TenantAccess?
-  users         TenantUser[]
-  userSessions  TenantUserSession[]
-  auditLogs     TenantAuditLog[]
+  subscriptions     TenantSubscription[]
+  access            TenantAccess?
+  users             TenantUser[]
+  userSessions      TenantUserSession[]
+  auditLogs         TenantAuditLog[]
+  platformAuditLogs PlatformAuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -487,10 +493,10 @@ enum TenantSessionRevokedReason {
 /// One login session of a tenant user. Holds the hash of the current refresh
 /// token; each refresh rotates to a new session row.
 model TenantUserSession {
-  id       String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  userId   String @db.Uuid
+  id       String     @id @default(uuid()) @db.Uuid
+  tenantId String     @db.Uuid
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userId   String     @db.Uuid
   /// Composite FK guarantees the session's user belongs to the same tenant.
   user     TenantUser @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Cascade)
 

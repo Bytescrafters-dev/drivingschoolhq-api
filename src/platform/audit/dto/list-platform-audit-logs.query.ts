@@ -33,6 +33,11 @@ export class ListPlatformAuditLogsQuery {
   @MaxLength(100)
   targetId?: string;
 
+  /** All entries about one tenant (its profile, subscriptions and users). */
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
+
   @IsOptional()
   @Type(() => Date)
   @IsDate()

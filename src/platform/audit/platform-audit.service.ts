@@ -18,6 +18,11 @@ export interface RecordPlatformAudit {
   actorAdminId: string | null;
   action: PlatformAuditAction;
   target?: { type: PlatformAuditTarget; id: string };
+  /**
+   * Tenant the action concerns. Required (DB CHECK) for TENANT,
+   * TENANT_SUBSCRIPTION and TENANT_USER targets.
+   */
+  tenantId?: string | null;
   metadata?: AuditMetadata;
   meta: RequestMeta;
 }
@@ -41,6 +46,7 @@ export class PlatformAuditService {
       action: entry.action,
       targetType: entry.target?.type ?? null,
       targetId: entry.target?.id ?? null,
+      tenantId: entry.tenantId ?? null,
       metadata: entry.metadata ?? null,
       ipAddress: entry.meta.ipAddress,
       userAgent: entry.meta.userAgent,

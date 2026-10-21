@@ -161,7 +161,8 @@ export class TenantOwnerAdminService {
       actorAdminId: actor.id,
       action,
       target: { type: PlatformAuditTarget.TENANT_USER, id: owner.id },
-      metadata: { tenantId: owner.tenantId, ...changes },
+      tenantId: owner.tenantId,
+      metadata: changes,
       meta,
     });
   }

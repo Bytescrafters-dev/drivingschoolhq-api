@@ -50,8 +50,8 @@ describe('TenantOwnerAdminService', () => {
       expect(audit.entries[0]).toMatchObject({
         action: PlatformAuditAction.TENANT_OWNER_UPDATED,
         target: { type: 'TENANT_USER', id: owner.id },
+        tenantId: tenant.id,
         metadata: {
-          tenantId: tenant.id,
           fullName: { from: 'Old Owner', to: 'New Owner' },
           email: { from: 'owner@school.lk', to: 'new@school.lk' },
           phone: { from: '+94771234567', to: '+94719876543' },

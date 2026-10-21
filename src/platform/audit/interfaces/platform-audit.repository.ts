@@ -12,6 +12,7 @@ export interface NewPlatformAuditEntry {
   action: PlatformAuditAction;
   targetType: PlatformAuditTarget | null;
   targetId: string | null;
+  tenantId: string | null;
   metadata: AuditMetadata | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -23,6 +24,7 @@ export interface PlatformAuditEntry {
   action: string;
   targetType: string | null;
   targetId: string | null;
+  tenantId: string | null;
   metadata: unknown;
   ipAddress: string | null;
   userAgent: string | null;
@@ -39,6 +41,7 @@ export interface PlatformAuditFilter {
   action?: string;
   targetType?: string;
   targetId?: string;
+  tenantId?: string;
   from?: Date;
   to?: Date;
 }
