@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client.js';
 import {
   TenantRole,
+  TenantUserBranchAccess,
   TenantUserStatus,
 } from '../../../generated/prisma/enums.js';
 import { AppError } from '../../../common/errors/app-error.js';
@@ -28,6 +29,8 @@ const TENANT_USER_SELECT = {
   passwordChangedAt: true,
   lastLoginAt: true,
   disabledAt: true,
+  branchAccess: true,
+  defaultBranchId: true,
   createdByPlatformAdminId: true,
   createdByTenantUserId: true,
   createdAt: true,
@@ -41,7 +44,12 @@ export class PrismaTenantUserRepository implements TenantUserRepository {
   async createOwner(owner: NewTenantOwner): Promise<TenantUser> {
     try {
       return await this.tx.client.tenantUser.create({
-        data: { ...owner, role: TenantRole.OWNER, mustChangePassword: true },
+        data: {
+          ...owner,
+          role: TenantRole.OWNER,
+          branchAccess: TenantUserBranchAccess.ALL,
+          mustChangePassword: true,
+        },
         select: TENANT_USER_SELECT,
       });
     } catch (error) {

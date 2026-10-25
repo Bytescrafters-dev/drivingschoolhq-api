@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { Env } from '../../config/env.js';
 import { TenantSessionsModule } from '../sessions/tenant-sessions.module.js';
 import { TenantAuthGuard } from './guards/tenant-auth.guard.js';
+import { TenantPermissionGuard } from './guards/tenant-permission.guard.js';
 import {
   TENANT_TOKEN_AUDIENCE,
   TENANT_TOKEN_ISSUER,
@@ -34,7 +35,12 @@ import {
       }),
     }),
   ],
-  providers: [TenantTokenService, TenantAuthGuard],
-  exports: [TenantTokenService, TenantAuthGuard, TenantSessionsModule],
+  providers: [TenantTokenService, TenantAuthGuard, TenantPermissionGuard],
+  exports: [
+    TenantTokenService,
+    TenantAuthGuard,
+    TenantPermissionGuard,
+    TenantSessionsModule,
+  ],
 })
 export class TenantAuthCoreModule {}

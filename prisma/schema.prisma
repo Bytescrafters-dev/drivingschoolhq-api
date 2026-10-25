@@ -60,6 +60,7 @@ model PlatformAdminUser {
   createdSubscriptions   TenantSubscription[] @relation("TenantSubscriptionCreatedBy")
   cancelledSubscriptions TenantSubscription[] @relation("TenantSubscriptionCancelledBy")
   createdTenantUsers     TenantUser[]
+  createdBranches        Branch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,7 +165,6 @@ enum PlanLimitCode {
 
 /// Feature entitlements (on/off).
 enum PlanFeatureCode {
-  MULTI_BRANCH
   SMS_NOTIFICATIONS
   ADVANCED_REPORTING
   API_ACCESS
@@ -316,6 +316,7 @@ model Tenant {
   userSessions      TenantUserSession[]
   auditLogs         TenantAuditLog[]
   platformAuditLogs PlatformAuditLog[]
+  branches          Branch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -456,6 +457,15 @@ model TenantUser {
   lastLoginAt        DateTime?
   disabledAt         DateTime?
 
+  /// ALL = every active branch of the tenant (including future ones);
+  /// SELECTED = only the branches in TenantUserBranch. The OWNER is always ALL
+  /// (DB CHECK).
+  branchAccess    TenantUserBranchAccess @default(SELECTED)
+  /// Branch the user works in after login. Composite FK keeps it in the same
+  /// tenant; for SELECTED users it is one of their assigned branches.
+  defaultBranchId String                 @db.Uuid
+  defaultBranch   Branch                 @relation("TenantUserDefaultBranch", fields: [tenantId, defaultBranchId], references: [tenantId, id], onDelete: Restrict)
+
   /// Exactly one creator is set: a platform admin (e.g. the OWNER) or a
   /// tenant user of the same tenant (staff).
   createdByPlatformAdminId String?            @db.Uuid
@@ -465,8 +475,10 @@ model TenantUser {
   createdByTenantUser      TenantUser?        @relation("TenantUserCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
   createdTenantUsers       TenantUser[]       @relation("TenantUserCreatedBy")
 
-  sessions        TenantUserSession[]
-  auditLogEntries TenantAuditLog[]
+  sessions          TenantUserSession[]
+  auditLogEntries   TenantAuditLog[]
+  branchAssignments TenantUserBranch[]
+  createdBranches   Branch[]            @relation("BranchCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -476,7 +488,73 @@ model TenantUser {
   @@unique([tenantId, nic])
   @@index([tenantId, role, status])
   @@index([createdByPlatformAdminId])
+  @@index([tenantId, defaultBranchId])
   @@map("tenant_users")
+}
+
+enum TenantUserBranchAccess {
+  ALL
+  SELECTED
+}
+
+// =============================================================================
+// DRIVING-SCHOOL DOMAIN — branches
+// =============================================================================
+
+enum BranchStatus {
+  ACTIVE
+  CLOSED
+}
+
+/// A physical branch of a driving school. Every tenant has at least one
+/// ACTIVE branch ("Main Branch" is created with the tenant). Branch-scoped
+/// records reference branches with a composite (tenantId, branchId) FK.
+/// Never hard-deleted: CLOSED instead. Names are unique per tenant,
+/// case-insensitively (hand-written unique index).
+model Branch {
+  id       String       @id @default(uuid()) @db.Uuid
+  tenantId String       @db.Uuid
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name     String
+  address  String
+  district District
+  /// Normalised to +94XXXXXXXXX by the application.
+  phone    String
+  status   BranchStatus @default(ACTIVE)
+  closedAt DateTime?
+
+  /// Exactly one creator: a platform admin (the Main Branch) or a tenant user.
+  createdByPlatformAdminId String?            @db.Uuid
+  createdByPlatformAdmin   PlatformAdminUser? @relation(fields: [createdByPlatformAdminId], references: [id], onDelete: Restrict)
+  createdByTenantUserId    String?            @db.Uuid
+  createdByTenantUser      TenantUser?        @relation("BranchCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
+
+  assignments     TenantUserBranch[]
+  defaultForUsers TenantUser[]       @relation("TenantUserDefaultBranch")
+  auditLogs       TenantAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+  @@map("branches")
+}
+
+/// Branches a SELECTED-access tenant user may work in. Composite FKs make an
+/// assignment across tenants impossible.
+model TenantUserBranch {
+  tenantId String     @db.Uuid
+  userId   String     @db.Uuid
+  user     TenantUser @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Cascade)
+  branchId String     @db.Uuid
+  branch   Branch     @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, branchId])
+  @@index([tenantId, branchId])
+  @@map("tenant_user_branches")
 }
 
 enum TenantSessionRevokedReason {
@@ -531,6 +609,9 @@ model TenantAuditLog {
   action            String
   targetType        String?
   targetId          String?
+  /// Branch the action happened in / concerns, when there is one.
+  branchId          String?     @db.Uuid
+  branch            Branch?     @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
   /// Changed fields / context only. Never secrets or password material.
   metadata          Json?
   ipAddress         String?
@@ -538,6 +619,7 @@ model TenantAuditLog {
   createdAt         DateTime    @default(now())
 
   @@index([tenantId, createdAt])
+  @@index([tenantId, branchId, createdAt])
   @@index([tenantId, actorTenantUserId, createdAt])
   @@index([tenantId, targetType, targetId, createdAt])
   @@map("tenant_audit_logs")

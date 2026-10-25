@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BranchesCoreModule } from '../../tenant/branches/branches-core.module.js';
 import { TenantSessionsModule } from '../../tenant/sessions/tenant-sessions.module.js';
 import { TenantUsersModule } from '../../tenant/users/tenant-users.module.js';
 import { PlatformAuthCoreModule } from '../admin-auth/platform-auth-core.module.js';
@@ -21,6 +22,7 @@ import { TenantsService } from './tenants.service.js';
     SubscriptionsModule,
     TenantUsersModule,
     TenantSessionsModule,
+    BranchesCoreModule,
   ],
   controllers: [
     TenantsController,

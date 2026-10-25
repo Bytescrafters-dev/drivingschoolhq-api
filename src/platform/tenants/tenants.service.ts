@@ -12,6 +12,8 @@ import {
   TenantStatus,
 } from '../../generated/prisma/enums.js';
 import { TransactionManager } from '../../prisma/transaction-manager.js';
+import { BranchProvisioningService } from '../../tenant/branches/branch-provisioning.service.js';
+import type { Branch } from '../../tenant/branches/interfaces/branch.repository.js';
 import { TenantSessionsService } from '../../tenant/sessions/tenant-sessions.service.js';
 import type { TenantUser } from '../../tenant/users/interfaces/tenant-user.repository.js';
 import { TenantOwnersService } from '../../tenant/users/tenant-owners.service.js';
@@ -76,7 +78,8 @@ export interface TenantDetails {
 /**
  * Platform use cases for driving-school tenants. Invariants:
  * - a tenant is always created together with its ACTIVE subscription, ACTIVE
- *   access record and its single OWNER, atomically;
+ *   access record, its "Main Branch" and its single OWNER (ALL branches,
+ *   defaulting to the Main Branch), atomically;
  * - closing ends/cancels subscriptions and signs every tenant user out, but
  *   never changes users or data;
  *   reopening starts a new subscription and restores access;
@@ -89,6 +92,7 @@ export class TenantsService {
     @Inject(TENANT_REPOSITORY) private readonly tenants: TenantRepository,
     private readonly subscriptions: SubscriptionsService,
     private readonly owners: TenantOwnersService,
+    private readonly branches: BranchProvisioningService,
     private readonly sessions: TenantSessionsService,
     private readonly audit: PlatformAuditService,
     private readonly passwords: PasswordHasher,
@@ -157,8 +161,24 @@ export class TenantsService {
         input.subscription,
         meta,
       );
+      const mainBranch = await this.branches.provisionMainBranch({
+        tenantId: tenant.id,
+        address: tenant.address,
+        district: tenant.district,
+        phone: tenant.phone,
+        createdByPlatformAdminId: actor.id,
+      });
+      await this.audited(
+        actor,
+        tenant.id,
+        PlatformAuditAction.BRANCH_CREATED,
+        meta,
+        { name: mainBranch.name, district: mainBranch.district },
+        { type: PlatformAuditTarget.BRANCH, id: mainBranch.id },
+      );
       const owner = await this.owners.provisionOwner({
         tenantId: tenant.id,
+        defaultBranchId: mainBranch.id,
         email: input.owner.email,
         fullName: input.owner.fullName,
         phone: input.owner.phone,
@@ -178,6 +198,12 @@ export class TenantsService {
       return tenant.id;
     });
     return this.get(tenantId);
+  }
+
+  /** Read-only view of a tenant's branches (oldest first, any status). */
+  async listBranches(tenantId: string): Promise<Branch[]> {
+    if (!(await this.tenants.findById(tenantId))) throw tenantNotFound();
+    return this.branches.listForTenant(tenantId);
   }
 
   async updateProfile(

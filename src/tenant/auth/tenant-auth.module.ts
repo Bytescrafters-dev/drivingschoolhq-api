@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PasswordHasher } from '../../common/security/password-hasher.js';
 import { TenantAuditModule } from '../audit/tenant-audit.module.js';
+import { BranchesCoreModule } from '../branches/branches-core.module.js';
 import { TenantContextModule } from '../context/tenant-context.module.js';
 import { TenantUsersModule } from '../users/tenant-users.module.js';
 import { TenantAuthCoreModule } from './tenant-auth-core.module.js';
@@ -13,6 +14,7 @@ import { TenantAuthService } from './tenant-auth.service.js';
     TenantUsersModule,
     TenantContextModule,
     TenantAuditModule,
+    BranchesCoreModule,
   ],
   controllers: [TenantAuthController],
   providers: [TenantAuthService, PasswordHasher],

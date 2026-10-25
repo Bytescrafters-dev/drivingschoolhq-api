@@ -25,6 +25,8 @@ import type {
   TenantSession,
   TenantSessionRepository,
 } from '../../src/tenant/sessions/interfaces/tenant-session.repository.js';
+import { BranchAccessService } from '../../src/tenant/branches/branch-access.service.js';
+import { InMemoryBranchRepository } from './branch-fakes.js';
 import { FakePasswordHasher, FixedClock, passthroughTx } from './fakes.js';
 import { InMemoryTenantUserRepository } from './tenancy-fakes.js';
 
@@ -49,6 +51,9 @@ export class InMemoryTenantContextRepository implements TenantContextRepository 
   }
   async findById(id: string) {
     return this.rows.find((t) => t.id === id) ?? null;
+  }
+  async lockById(id: string) {
+    return this.findById(id);
   }
 }
 
@@ -95,6 +100,8 @@ export class InMemoryTenantSessionRepository implements TenantSessionRepository 
           role: user.role,
           status: user.status,
           mustChangePassword: user.mustChangePassword,
+          branchAccess: user.branchAccess,
+          defaultBranchId: user.defaultBranchId,
         },
         tenant: { id: tenant.id, status: tenant.status },
       },
@@ -203,6 +210,7 @@ export function tenantAuthSetup() {
   const hasher = new FakePasswordHasher();
   const clock = new FixedClock();
   const tokens = tenantTokenService();
+  const branches = new InMemoryBranchRepository(users);
   const service = new TenantAuthService(
     tenants,
     users,
@@ -212,10 +220,12 @@ export function tenantAuthSetup() {
     new TenantAuditService(auditRepo),
     passthroughTx,
     clock,
+    new BranchAccessService(branches),
   );
   return {
     tenants,
     users,
+    branches,
     sessions,
     auditRepo,
     hasher,

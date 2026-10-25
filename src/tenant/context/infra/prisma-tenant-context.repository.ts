@@ -32,6 +32,12 @@ export class PrismaTenantContextRepository implements TenantContextRepository {
     return row ? toContext(row) : null;
   }
 
+  async lockById(id: string): Promise<TenantContext | null> {
+    const locked = await this.tx.client.$queryRaw<{ id: string }[]>`
+      SELECT id FROM tenants WHERE id = ${id}::uuid FOR UPDATE`;
+    return locked.length === 0 ? null : this.findById(id);
+  }
+
   async findById(id: string): Promise<TenantContext | null> {
     const row = await this.tx.client.tenant.findUnique({
       where: { id },

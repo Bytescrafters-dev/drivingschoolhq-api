@@ -81,7 +81,7 @@ export class TenantAuthController {
   @TenantAuth()
   @TenantAllowPasswordChangeRequired()
   async me(@CurrentTenantUser() actor: AuthenticatedTenantUser) {
-    const { user, tenant } = await this.auth.me(actor);
+    const { user, tenant, branches } = await this.auth.me(actor);
     return {
       user: {
         id: user.id,
@@ -89,6 +89,9 @@ export class TenantAuthController {
         fullName: user.fullName,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
+        branchAccess: user.branchAccess,
+        /** Branch to open after login; null when no branch is workable. */
+        defaultBranchId: branches.defaultBranchId,
       },
       tenant: {
         id: tenant.id,
@@ -96,6 +99,13 @@ export class TenantAuthController {
         displayName: tenant.displayName,
         accessStatus: tenant.accessStatus,
       },
+      /** ACTIVE branches the user can switch between (send as X-Branch-Id). */
+      branches: branches.branches.map((branch) => ({
+        id: branch.id,
+        name: branch.name,
+        district: branch.district,
+        isDefault: branch.id === branches.defaultBranchId,
+      })),
     };
   }
 }

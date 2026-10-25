@@ -1,7 +1,9 @@
 import {
+  BranchStatus,
   TenantAccessStatus,
   TenantRole,
   TenantStatus,
+  TenantUserBranchAccess,
   TenantUserStatus,
 } from '../../generated/prisma/enums.js';
 import { META, expectAppError } from '../../../test/support/fakes.js';
@@ -25,19 +27,31 @@ function withUser(
     status: overrides.tenantStatus ?? TenantStatus.ACTIVE,
     accessStatus: overrides.accessStatus ?? TenantAccessStatus.ACTIVE,
   });
+  const mainBranch = ctx.branches.seed({
+    tenantId: tenant.id,
+    name: 'Main Branch',
+  });
   const user = ctx.users.seedUser({
     tenantId: tenant.id,
     role: TenantRole.OWNER,
+    branchAccess: TenantUserBranchAccess.ALL,
+    defaultBranchId: mainBranch.id,
     email: 'owner@school.lk',
     status: overrides.userStatus ?? TenantUserStatus.ACTIVE,
     mustChangePassword: overrides.mustChangePassword ?? true,
     passwordHash: `hashed:${PASSWORD}`,
   });
-  return { ...ctx, tenant, user };
+  return { ...ctx, tenant, user, mainBranch };
 }
 
 function actorOf(
-  user: { id: string; tenantId: string; email: string },
+  user: {
+    id: string;
+    tenantId: string;
+    email: string;
+    branchAccess: TenantUserBranchAccess;
+    defaultBranchId: string;
+  },
   sessionId: string,
 ): AuthenticatedTenantUser {
   return {
@@ -48,6 +62,8 @@ function actorOf(
     role: TenantRole.OWNER,
     sessionId,
     mustChangePassword: false,
+    branchAccess: user.branchAccess,
+    defaultBranchId: user.defaultBranchId,
   };
 }
 
@@ -285,6 +301,58 @@ describe('TenantAuthService', () => {
         ),
         code,
       );
+    });
+  });
+
+  describe('me', () => {
+    it('returns the workable branches and the default branch', async () => {
+      const { service, user, tenant, branches, mainBranch } = withUser();
+      const second = branches.seed({ tenantId: tenant.id, name: 'Kandy' });
+      branches.seed({
+        tenantId: tenant.id,
+        name: 'Old',
+        status: BranchStatus.CLOSED,
+        closedAt: new Date(),
+      });
+
+      const me = await service.me(actorOf(user, crypto.randomUUID()));
+
+      expect(me.branches.branches.map((b) => b.name)).toEqual([
+        'Main Branch',
+        'Kandy',
+      ]);
+      expect(me.branches.defaultBranchId).toBe(mainBranch.id);
+      expect(second.id).not.toBe(mainBranch.id);
+    });
+
+    it('falls back to the first workable branch when the stored default is closed', async () => {
+      const { service, user, tenant, branches, mainBranch } = withUser();
+      const kandy = branches.seed({ tenantId: tenant.id, name: 'Kandy' });
+      await branches.setStatus(
+        tenant.id,
+        mainBranch.id,
+        BranchStatus.CLOSED,
+        new Date(),
+      );
+
+      const me = await service.me(actorOf(user, crypto.randomUUID()));
+      expect(me.branches.defaultBranchId).toBe(kandy.id);
+    });
+
+    it('shows a SELECTED user only their assigned branches', async () => {
+      const { service, users, tenant, branches, mainBranch } = withUser();
+      const kandy = branches.seed({ tenantId: tenant.id, name: 'Kandy' });
+      const clerk = users.seedUser({
+        tenantId: tenant.id,
+        branchAccess: TenantUserBranchAccess.SELECTED,
+        defaultBranchId: kandy.id,
+      });
+      branches.assign(tenant.id, clerk.id, kandy.id);
+
+      const me = await service.me(actorOf(clerk, crypto.randomUUID()));
+      expect(me.branches.branches.map((b) => b.id)).toEqual([kandy.id]);
+      expect(me.branches.defaultBranchId).toBe(kandy.id);
+      expect(mainBranch.id).not.toBe(kandy.id);
     });
   });
 });

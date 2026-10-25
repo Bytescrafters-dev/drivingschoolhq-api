@@ -15,7 +15,8 @@ export function configureCors(app: INestApplication): void {
   app.enableCors({
     origin: origins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    // X-Branch-Id selects the working branch on tenant branch-scoped routes.
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Branch-Id'],
     credentials: false,
     maxAge: 600,
   });

@@ -97,6 +97,8 @@ export class TenantAuthGuard implements CanActivate {
       role: user.role,
       sessionId: found.session.id,
       mustChangePassword: user.mustChangePassword,
+      branchAccess: user.branchAccess,
+      defaultBranchId: user.defaultBranchId,
     };
     return true;
   }

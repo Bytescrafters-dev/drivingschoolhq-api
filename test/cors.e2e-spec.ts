@@ -30,13 +30,17 @@ describe('CORS (e2e)', () => {
       .options('/platform/plans')
       .set('Origin', ALLOWED)
       .set('Access-Control-Request-Method', 'PATCH')
-      .set('Access-Control-Request-Headers', 'authorization,content-type')
+      .set(
+        'Access-Control-Request-Headers',
+        'authorization,content-type,x-branch-id',
+      )
       .expect(204);
     expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
     expect(res.headers['access-control-allow-methods']).toContain('PATCH');
     expect(res.headers['access-control-allow-headers']).toMatch(
       /Authorization/i,
     );
+    expect(res.headers['access-control-allow-headers']).toMatch(/X-Branch-Id/i);
     expect(res.headers['access-control-allow-credentials']).toBeUndefined();
   });
 

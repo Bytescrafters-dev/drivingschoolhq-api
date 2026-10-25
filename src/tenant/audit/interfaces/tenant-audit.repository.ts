@@ -11,6 +11,7 @@ export interface NewTenantAuditEntry {
   action: TenantAuditAction;
   targetType: TenantAuditTarget | null;
   targetId: string | null;
+  branchId: string | null;
   metadata: Record<string, unknown> | null;
   ipAddress: string | null;
   userAgent: string | null;

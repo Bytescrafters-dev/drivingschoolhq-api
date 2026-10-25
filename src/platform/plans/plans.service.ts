@@ -48,6 +48,15 @@ export interface CreatePlanInput {
 const ALL_LIMIT_CODES = Object.values(PlanLimitCode);
 
 /**
+ * Limits that must allow at least one: every tenant always has its Main
+ * Branch and its OWNER (who counts as a staff user).
+ */
+const AT_LEAST_ONE: readonly PlanLimitCode[] = [
+  PlanLimitCode.MAX_BRANCHES,
+  PlanLimitCode.MAX_STAFF_USERS,
+];
+
+/**
  * Use cases for the SaaS plan catalogue. Invariants:
  * - plans start as DRAFT; only DRAFT plans may be deleted (they were never
  *   subscribable, so nothing references them);
@@ -444,6 +453,17 @@ function assertCompleteLimits(limits: PlanLimit[]): void {
       'BAD_REQUEST',
       'PLAN_LIMITS_INVALID',
       `Every limit must be given exactly once (${problems.join('; ')})`,
+    );
+  }
+  const belowOne = limits
+    .filter((limit) => AT_LEAST_ONE.includes(limit.code))
+    .filter((limit) => limit.value !== null && limit.value < 1)
+    .map((limit) => limit.code);
+  if (belowOne.length > 0) {
+    throw new AppError(
+      'BAD_REQUEST',
+      'PLAN_LIMITS_INVALID',
+      `${belowOne.join(', ')} must be at least 1 (or unlimited): every school has a Main Branch and an owner`,
     );
   }
 }

@@ -30,6 +30,7 @@ import {
   toTenantDetailsResponse,
   toTenantListItemResponse,
 } from './interfaces/tenant.response.js';
+import { toBranchResponse } from '../../tenant/branches/interfaces/branch.response.js';
 import { TenantsService } from './tenants.service.js';
 
 @Controller('platform/tenants')
@@ -56,6 +57,13 @@ export class TenantsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TenantDetailsResponse> {
     return toTenantDetailsResponse(await this.tenants.get(id));
+  }
+
+  @Get(':id/branches')
+  @RequirePlatformPermissions(PlatformPermission.TENANTS_READ)
+  async branches(@Param('id', ParseUUIDPipe) id: string) {
+    const branches = await this.tenants.listBranches(id);
+    return { items: branches.map(toBranchResponse) };
   }
 
   @Post()

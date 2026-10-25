@@ -9,7 +9,9 @@ import { SubscriptionsService } from '../../src/platform/subscriptions/subscript
 import { TenantOwnerAdminService } from '../../src/platform/tenants/tenant-owner-admin.service.js';
 import { TenantSubscriptionsService } from '../../src/platform/tenants/tenant-subscriptions.service.js';
 import { TenantsService } from '../../src/platform/tenants/tenants.service.js';
+import { BranchProvisioningService } from '../../src/tenant/branches/branch-provisioning.service.js';
 import { TenantOwnersService } from '../../src/tenant/users/tenant-owners.service.js';
+import { InMemoryBranchRepository } from './branch-fakes.js';
 import {
   FakeAuditService,
   FakePasswordHasher,
@@ -32,6 +34,7 @@ export function tenancySetup() {
   const tenants = new InMemoryTenantRepository();
   const subscriptionRows = new InMemorySubscriptionRepository();
   const users = new InMemoryTenantUserRepository();
+  const branches = new InMemoryBranchRepository(users);
   const audit = new FakeAuditService();
   // 2026-10-07T10:00Z → 2026-10-07 in Asia/Colombo.
   const clock = new FixedClock();
@@ -62,6 +65,7 @@ export function tenancySetup() {
     tenants,
     subscriptions,
     owners,
+    new BranchProvisioningService(branches),
     tenantSessions.asService(),
     audit.asService(),
     new FakePasswordHasher().asHasher(),
@@ -109,6 +113,7 @@ export function tenancySetup() {
     tenants,
     subscriptionRows,
     users,
+    branches,
     tenantSessions,
     audit,
     clock,

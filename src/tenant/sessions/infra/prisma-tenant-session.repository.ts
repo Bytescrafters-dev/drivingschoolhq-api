@@ -44,6 +44,8 @@ export class PrismaTenantSessionRepository implements TenantSessionRepository {
             role: true,
             status: true,
             mustChangePassword: true,
+            branchAccess: true,
+            defaultBranchId: true,
           },
         },
         tenant: { select: { id: true, status: true } },

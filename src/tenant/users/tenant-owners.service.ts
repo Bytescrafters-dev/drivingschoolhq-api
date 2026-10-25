@@ -25,6 +25,8 @@ export interface ProvisionTenantOwnerInput {
   nic: string;
   /** Already hashed by the caller (hashing stays outside transactions). */
   passwordHash: string;
+  /** The tenant's Main Branch. */
+  defaultBranchId: string;
   createdByPlatformAdminId: string;
 }
 
@@ -72,6 +74,7 @@ export class TenantOwnersService {
       phone,
       nic,
       passwordHash: input.passwordHash,
+      defaultBranchId: input.defaultBranchId,
       createdByPlatformAdminId: input.createdByPlatformAdminId,
     });
   }

@@ -13,8 +13,8 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   assertTestDatabase(process.env.DATABASE_URL!);
   await prisma.$executeRawUnsafe(
     `TRUNCATE
-       tenant_audit_logs, tenant_user_sessions,
-       tenant_users, tenant_access, tenant_subscriptions, tenants,
+       tenant_audit_logs, tenant_user_sessions, tenant_user_branches,
+       tenant_users, branches, tenant_access, tenant_subscriptions, tenants,
        plan_features, plan_limits, plan_prices, price_plans,
        platform_audit_logs, platform_admin_sessions, platform_admin_users
      CASCADE`,

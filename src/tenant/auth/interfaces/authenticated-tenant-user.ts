@@ -1,5 +1,8 @@
 import type { Request } from 'express';
-import type { TenantRole } from '../../../generated/prisma/enums.js';
+import type {
+  TenantRole,
+  TenantUserBranchAccess,
+} from '../../../generated/prisma/enums.js';
 
 /**
  * The tenant user behind the current request, resolved by TenantAuthGuard
@@ -13,6 +16,10 @@ export interface AuthenticatedTenantUser {
   role: TenantRole;
   sessionId: string;
   mustChangePassword: boolean;
+  /** Loaded per request, so access changes apply immediately. */
+  branchAccess: TenantUserBranchAccess;
+  /** Stored default; may point at a branch that has since closed. */
+  defaultBranchId: string;
 }
 
 export interface TenantAuthenticatedRequest extends Request {

@@ -1,5 +1,6 @@
 import type {
   TenantRole,
+  TenantUserBranchAccess,
   TenantUserStatus,
 } from '../../../generated/prisma/enums.js';
 
@@ -19,6 +20,8 @@ export interface TenantUser {
   passwordChangedAt: Date | null;
   lastLoginAt: Date | null;
   disabledAt: Date | null;
+  branchAccess: TenantUserBranchAccess;
+  defaultBranchId: string;
   createdByPlatformAdminId: string | null;
   createdByTenantUserId: string | null;
   createdAt: Date;
@@ -37,6 +40,8 @@ export interface NewTenantOwner {
   phone: string;
   nic: string;
   passwordHash: string;
+  /** The tenant's Main Branch. The owner always has ALL branch access. */
+  defaultBranchId: string;
   createdByPlatformAdminId: string;
 }
 

@@ -1,5 +1,6 @@
 import type {
   TenantRole,
+  TenantUserBranchAccess,
   TenantSessionRevokedReason,
   TenantStatus,
   TenantUserStatus,
@@ -26,6 +27,8 @@ export interface SessionPrincipal {
     role: TenantRole;
     status: TenantUserStatus;
     mustChangePassword: boolean;
+    branchAccess: TenantUserBranchAccess;
+    defaultBranchId: string;
   };
   tenant: { id: string; status: TenantStatus };
 }

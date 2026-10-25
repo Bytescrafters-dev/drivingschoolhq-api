@@ -84,7 +84,7 @@ describe('Platform audit log filtered by tenant (e2e)', () => {
       .set(bearer())
       .expect(200);
 
-  it("returns every entry about the tenant's profile, subscriptions and owner, and nothing else", async () => {
+  it("returns every entry about the tenant's profile, subscriptions, branches and owner, and nothing else", async () => {
     const a = await onboard('DS101');
     const b = await onboard('DS102');
 
@@ -118,6 +118,7 @@ describe('Platform audit log filtered by tenant (e2e)', () => {
     expect(items.map((e) => e.action).reverse()).toEqual([
       'TENANT_CREATED',
       'SUBSCRIPTION_CREATED',
+      'BRANCH_CREATED',
       'TENANT_OWNER_CREATED',
       'TENANT_UPDATED',
       'SUBSCRIPTION_GRACE_PERIOD_CHANGED',
@@ -133,7 +134,7 @@ describe('Platform audit log filtered by tenant (e2e)', () => {
     expect(res.body.nextCursor).toBeNull();
 
     const other = (await auditFor(b)).body.items as { tenantId: string }[];
-    expect(other).toHaveLength(3);
+    expect(other).toHaveLength(4);
     expect(other.every((e) => e.tenantId === b)).toBe(true);
   });
 
@@ -161,7 +162,7 @@ describe('Platform audit log filtered by tenant (e2e)', () => {
       .query({ tenantId: a, limit: 2, cursor: first.body.nextCursor })
       .set(bearer())
       .expect(200);
-    expect(second.body.items).toHaveLength(1);
+    expect(second.body.items).toHaveLength(2);
     expect(second.body.nextCursor).toBeNull();
   });
 

@@ -455,6 +455,44 @@ describe('PlansService', () => {
       );
     });
 
+    it.each([PlanLimitCode.MAX_BRANCHES, PlanLimitCode.MAX_STAFF_USERS])(
+      'requires %s to allow at least one (Main Branch and owner always exist)',
+      async (code) => {
+        const { service, plans, actor } = setup();
+        const plan = plans.seedPlan();
+        const limits = FULL_LIMITS.map((limit) =>
+          limit.code === code ? { code, value: 0 } : limit,
+        );
+        await expectAppError(
+          service.setLimits(actor, plan.id, limits, META),
+          'PLAN_LIMITS_INVALID',
+        );
+        await expectAppError(
+          service.createPlan(
+            actor,
+            { code: 'ZERO', name: 'Zero', limits },
+            META,
+          ),
+          'PLAN_LIMITS_INVALID',
+        );
+      },
+    );
+
+    it('still allows zero instructors or vehicles', async () => {
+      const { service, plans, actor } = setup();
+      const plan = plans.seedPlan();
+      const limits = FULL_LIMITS.map((limit) =>
+        limit.code === PlanLimitCode.MAX_VEHICLES
+          ? { code: limit.code, value: 0 }
+          : limit,
+      );
+      const updated = await service.setLimits(actor, plan.id, limits, META);
+      expect(updated.limits).toContainEqual({
+        code: PlanLimitCode.MAX_VEHICLES,
+        value: 0,
+      });
+    });
+
     it('does not audit identical limits given in a different order', async () => {
       const { service, plans, audit, actor } = setup();
       const plan = seedActivatable(plans);
@@ -472,18 +510,21 @@ describe('PlansService', () => {
       const updated = await service.setFeatures(
         actor,
         plan.id,
-        [PlanFeatureCode.MULTI_BRANCH, PlanFeatureCode.SMS_NOTIFICATIONS],
+        [PlanFeatureCode.ADVANCED_REPORTING, PlanFeatureCode.SMS_NOTIFICATIONS],
         META,
       );
 
       expect(updated.features).toEqual([
-        PlanFeatureCode.MULTI_BRANCH,
+        PlanFeatureCode.ADVANCED_REPORTING,
         PlanFeatureCode.SMS_NOTIFICATIONS,
       ]);
       expect(audit.entries[0]!.metadata).toEqual({
         features: {
           from: [PlanFeatureCode.API_ACCESS],
-          to: [PlanFeatureCode.MULTI_BRANCH, PlanFeatureCode.SMS_NOTIFICATIONS],
+          to: [
+            PlanFeatureCode.ADVANCED_REPORTING,
+            PlanFeatureCode.SMS_NOTIFICATIONS,
+          ],
         },
       });
     });

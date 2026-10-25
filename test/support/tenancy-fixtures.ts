@@ -3,10 +3,12 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../src/generated/prisma/client.js';
 import {
   BillingPeriod,
+  BranchStatus,
   District,
   PricePlanStatus,
   TenantRole,
   TenantSubscriptionStatus,
+  TenantUserBranchAccess,
 } from '../../src/generated/prisma/enums.js';
 
 function suffix(): string {
@@ -92,11 +94,59 @@ export async function createSubscription(
   });
 }
 
+/** Creates a branch; the creator defaults to the tenant's creating admin. */
+export async function createBranch(
+  prisma: PrismaClient,
+  args: {
+    tenantId: string;
+    name?: string;
+    status?: BranchStatus;
+    createdByPlatformAdminId?: string;
+  },
+) {
+  const createdBy =
+    args.createdByPlatformAdminId ??
+    (
+      await prisma.tenant.findUniqueOrThrow({
+        where: { id: args.tenantId },
+        select: { createdById: true },
+      })
+    ).createdById;
+  const status = args.status ?? BranchStatus.ACTIVE;
+  return prisma.branch.create({
+    data: {
+      tenantId: args.tenantId,
+      name: args.name ?? `Branch ${randomUUID().slice(0, 6)}`,
+      address: '1 Main Street',
+      district: District.COLOMBO,
+      phone: '+94771234567',
+      status,
+      closedAt: status === BranchStatus.CLOSED ? new Date() : null,
+      createdByPlatformAdminId: createdBy,
+    },
+  });
+}
+
+/** The tenant's oldest branch, creating a "Main Branch" if it has none. */
+export async function mainBranchOf(prisma: PrismaClient, tenantId: string) {
+  const existing = await prisma.branch.findFirst({
+    where: { tenantId },
+    orderBy: { createdAt: 'asc' },
+  });
+  return existing ?? createBranch(prisma, { tenantId, name: 'Main Branch' });
+}
+
+/**
+ * Creates a tenant user. Defaults: the tenant's Main Branch as default
+ * branch; OWNER gets ALL access, others SELECTED and assigned to the default.
+ */
 export async function createTenantUser(
   prisma: PrismaClient,
   args: {
     tenantId: string;
     role?: TenantRole;
+    branchAccess?: TenantUserBranchAccess;
+    defaultBranchId?: string;
     email?: string;
     nic?: string | null;
     phone?: string | null;
@@ -106,8 +156,22 @@ export async function createTenantUser(
 ) {
   const role = args.role ?? TenantRole.FRONT_DESK;
   const isOwner = role === TenantRole.OWNER;
+  const branchAccess =
+    args.branchAccess ??
+    (isOwner ? TenantUserBranchAccess.ALL : TenantUserBranchAccess.SELECTED);
+  const defaultBranchId =
+    args.defaultBranchId ?? (await mainBranchOf(prisma, args.tenantId)).id;
   return prisma.tenantUser.create({
     data: {
+      branchAccess,
+      defaultBranchId,
+      ...(branchAccess === TenantUserBranchAccess.SELECTED
+        ? {
+            branchAssignments: {
+              create: { branchId: defaultBranchId },
+            },
+          }
+        : {}),
       tenantId: args.tenantId,
       email: args.email ?? `${randomUUID().slice(0, 8)}@school.lk`,
       fullName: 'Fixture Tenant User',

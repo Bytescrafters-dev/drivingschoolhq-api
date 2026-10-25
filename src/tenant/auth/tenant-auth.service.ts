@@ -30,6 +30,10 @@ import {
   type TenantUserRepository,
 } from '../users/interfaces/tenant-user.repository.js';
 import type { AuthenticatedTenantUser } from './interfaces/authenticated-tenant-user.js';
+import {
+  BranchAccessService,
+  type MyBranches,
+} from '../branches/branch-access.service.js';
 import { TenantTokenService } from './tenant-token.service.js';
 
 export interface TenantAuthTokens {
@@ -44,6 +48,7 @@ export interface TenantAuthTokens {
 export interface TenantMe {
   user: AuthenticatedTenantUser;
   tenant: TenantContext;
+  branches: MyBranches;
 }
 
 type FailedLoginReason =
@@ -69,6 +74,7 @@ export class TenantAuthService {
     private readonly audit: TenantAuditService,
     private readonly tx: TransactionManager,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly branches: BranchAccessService,
   ) {}
 
   async login(
@@ -281,7 +287,11 @@ export class TenantAuthService {
         'Session is no longer valid',
       );
     }
-    return { user: actor, tenant };
+    return {
+      user: actor,
+      tenant,
+      branches: await this.branches.myBranches(actor),
+    };
   }
 
   private async openSession(

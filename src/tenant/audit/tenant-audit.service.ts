@@ -14,6 +14,8 @@ export interface RecordTenantAudit {
   actorTenantUserId: string | null;
   action: TenantAuditAction;
   target?: { type: TenantAuditTarget; id: string };
+  /** Branch the action happened in or concerns. */
+  branchId?: string | null;
   /** Context only. Never secrets or password material. */
   metadata?: Record<string, unknown>;
   meta: RequestMeta;
@@ -34,6 +36,7 @@ export class TenantAuditService {
       action: entry.action,
       targetType: entry.target?.type ?? null,
       targetId: entry.target?.id ?? null,
+      branchId: entry.branchId ?? null,
       metadata: entry.metadata ?? null,
       ipAddress: entry.meta.ipAddress,
       userAgent: entry.meta.userAgent,

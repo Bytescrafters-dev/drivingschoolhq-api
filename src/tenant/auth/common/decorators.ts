@@ -5,15 +5,27 @@ import {
   SetMetadata,
   UseGuards,
 } from '@nestjs/common';
+import type { TenantPermission } from '../../permissions/tenant-permission.js';
 import { TenantAuthGuard } from '../guards/tenant-auth.guard.js';
+import { TenantPermissionGuard } from '../guards/tenant-permission.guard.js';
 import type {
   AuthenticatedTenantUser,
   TenantAuthenticatedRequest,
 } from '../interfaces/authenticated-tenant-user.js';
-import { TENANT_ALLOW_PASSWORD_CHANGE_REQUIRED } from './metadata-keys.js';
+import {
+  REQUIRED_TENANT_PERMISSIONS,
+  TENANT_ALLOW_PASSWORD_CHANGE_REQUIRED,
+} from './metadata-keys.js';
 
-/** Requires an authenticated, active tenant user session. */
-export const TenantAuth = () => applyDecorators(UseGuards(TenantAuthGuard));
+/**
+ * Requires an authenticated, active tenant user session, plus the
+ * permissions declared with @RequireTenantPermissions().
+ */
+export const TenantAuth = () =>
+  applyDecorators(UseGuards(TenantAuthGuard, TenantPermissionGuard));
+
+export const RequireTenantPermissions = (...permissions: TenantPermission[]) =>
+  SetMetadata(REQUIRED_TENANT_PERMISSIONS, permissions);
 
 /** Lets tenant users with a temporary password reach this handler. */
 export const TenantAllowPasswordChangeRequired = () =>

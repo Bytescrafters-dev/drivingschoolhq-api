@@ -21,4 +21,10 @@ export interface TenantContext {
 export interface TenantContextRepository {
   findByDsCode(dsCode: string): Promise<TenantContext | null>;
   findById(id: string): Promise<TenantContext | null>;
+  /**
+   * Locks the tenant row (FOR UPDATE) for the rest of the transaction.
+   * Serialises limit-checked changes inside one tenant (e.g. branch counts).
+   * Lock order: tenant → branches → users.
+   */
+  lockById(id: string): Promise<TenantContext | null>;
 }

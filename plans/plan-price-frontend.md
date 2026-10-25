@@ -13,7 +13,7 @@ here reflects the backend as implemented on branch `feat/tenancy-plans-subscript
 PricePlan  (the product, e.g. STARTER / PROFESSIONAL)
  ├── PlanPrice   0..n   — what it costs per billing period (MONTHLY / QUARTERLY / ANNUAL)
  ├── PlanLimit   0..4   — numeric caps (staff users, branches, instructors, vehicles)
- └── PlanFeature 0..4   — on/off entitlements (multi-branch, SMS, reporting, API)
+ └── PlanFeature 0..3   — on/off entitlements (SMS, reporting, API)
 
 TenantSubscription ──► PlanPrice (a tenant subscribes to a specific *price*, not to a plan)
 ```
@@ -22,7 +22,7 @@ TenantSubscription ──► PlanPrice (a tenant subscribes to a specific *price
 |---|---|---|
 | **PricePlan** | Catalogue product. Has `code` (unique, uppercased, immutable after create), `name`, `description`, `isPublic`, `sortOrder`, `status`. | Lifecycle `DRAFT → ACTIVE ⇄ ARCHIVED` (see §3). Never hard-deleted once it has been active. |
 | **PlanPrice** | Amount in **LKR** for one billing period. | At most **one ACTIVE price per billing period** per plan. Prices are **immutable**: "changing" a price archives the old one and creates a new one (new `id`). Archived prices stay forever, because existing subscriptions point at them. |
-| **PlanLimit** | `{ code, value }`. `value: null` = **unlimited**, otherwise integer `0 … 1,000,000`. | Always set as a **complete set**: every limit code exactly once. Changes apply **immediately** to every tenant on that plan. |
+| **PlanLimit** | `{ code, value }`. `value: null` = **unlimited**, otherwise integer `0 … 1,000,000`. | Always set as a **complete set**: every limit code exactly once. `MAX_BRANCHES` and `MAX_STAFF_USERS` must be **≥ 1** (or unlimited), because every school has a Main Branch and an owner who counts as a staff user. Changes apply **immediately** to every tenant on that plan. `MAX_BRANCHES` alone decides how many branches a school may run (there is no separate multi-branch feature). |
 | **PlanFeature** | A feature code the plan includes. Presence = enabled. | Set as a whole list (replace). Changes apply **immediately** to every tenant on that plan. |
 
 Dependencies:
@@ -44,7 +44,7 @@ Dependencies:
 | `PlanPriceStatus` | `ACTIVE`, `ARCHIVED` | Current / Archived |
 | `BillingPeriod` | `MONTHLY`, `QUARTERLY`, `ANNUAL` | Monthly / Quarterly (3 months) / Annual |
 | `PlanLimitCode` | `MAX_STAFF_USERS`, `MAX_BRANCHES`, `MAX_INSTRUCTORS`, `MAX_VEHICLES` | Staff users / Branches / Instructors / Vehicles |
-| `PlanFeatureCode` | `MULTI_BRANCH`, `SMS_NOTIFICATIONS`, `ADVANCED_REPORTING`, `API_ACCESS` | Multi-branch / SMS notifications / Advanced reporting / API access |
+| `PlanFeatureCode` | `SMS_NOTIFICATIONS`, `ADVANCED_REPORTING`, `API_ACCESS` | SMS notifications / Advanced reporting / API access (`MULTI_BRANCH` was removed; sending it returns `400`) |
 
 ---
 
@@ -207,7 +207,7 @@ returns active prices only. Use `includeArchived=true` for a "Price history" tab
     { "code": "MAX_INSTRUCTORS", "value": 10 },
     { "code": "MAX_VEHICLES",    "value": null }
   ],
-  "features": ["MULTI_BRANCH", "SMS_NOTIFICATIONS"]
+  "features": ["SMS_NOTIFICATIONS", "ADVANCED_REPORTING"]
 }
 ```
 
@@ -219,7 +219,7 @@ returns active prices only. Use `includeArchived=true` for a "Price history" tab
 | `isPublic` | optional, default `true` |
 | `sortOrder` | optional int 0–10000, default `0` |
 | `prices` | optional, ≤ 3, one per billing period → `400 PLAN_PRICE_DUPLICATE_PERIOD` |
-| `limits` | optional. **If sent, it must contain all 4 codes exactly once** → `400 PLAN_LIMITS_INVALID` |
+| `limits` | optional. **If sent, it must contain all 4 codes exactly once**, with `MAX_BRANCHES` / `MAX_STAFF_USERS` ≥ 1 or `null` → `400 PLAN_LIMITS_INVALID` |
 | `features` | optional, unique feature codes |
 
 ### 4.5 Update plan details
@@ -272,7 +272,8 @@ price of an ACTIVE plan.
 ```
 
 Always send **all 4** codes → otherwise `400 PLAN_LIMITS_INVALID`. UI: a form with one row per limit,
-each with a number input (0–1,000,000) and an "Unlimited" toggle (sends `null`). Pre-fill from
+each with a number input (0–1,000,000; minimum 1 for branches and staff users) and an "Unlimited"
+toggle (sends `null`). Pre-fill from
 `plan.limits`.
 
 ### 4.10 Set features (replace all)
@@ -280,10 +281,10 @@ each with a number input (0–1,000,000) and an "Unlimited" toggle (sends `null`
 `PUT /platform/plans/:id/features` · `PLANS_MANAGE` → `PlanDetailsResponse`
 
 ```json
-{ "features": ["MULTI_BRANCH", "ADVANCED_REPORTING"] }
+{ "features": ["SMS_NOTIFICATIONS", "ADVANCED_REPORTING"] }
 ```
 
-Send the full list of enabled features; `[]` removes all. UI: a checkbox list of the 4 feature codes.
+Send the full list of enabled features; `[]` removes all. UI: a checkbox list of the 3 feature codes.
 
 ---
 
@@ -295,7 +296,7 @@ All errors look like `{ statusCode, code, message }`. Switch on `code`, not on `
 |---|---|---|---|
 | 400 | `BAD_REQUEST` | DTO validation (bad regex, unknown field, out of range) | show `message` (multiple problems are joined with `; `) |
 | 400 | `INVALID_AMOUNT` | prices | field error on the amount |
-| 400 | `PLAN_LIMITS_INVALID` | create/limits | "All limits must be set" |
+| 400 | `PLAN_LIMITS_INVALID` | create/limits | "All limits must be set" or "Branches and staff users must be at least 1"; show `message` |
 | 400 | `PLAN_PRICE_DUPLICATE_PERIOD` | create | field error on the duplicated period |
 | 401 | `AUTHENTICATION_REQUIRED` / `INVALID_ACCESS_TOKEN` / `SESSION_INVALID` | any | try `POST /platform/auth/refresh` once, else go to login |
 | 403 | `PASSWORD_CHANGE_REQUIRED` | any | redirect to change-password |

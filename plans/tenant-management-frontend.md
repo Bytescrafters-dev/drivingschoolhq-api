@@ -20,8 +20,9 @@ Tenant (driving school, DS code)       │
  ├── TenantAccess        1   ACTIVE | GRACE_PERIOD | SUSPENDED   (can the school use the SaaS?)
  ├── TenantSubscription  n   history; at most 1 ACTIVE + 1 SCHEDULED at any time
  │      └── snapshot of plan/price/agreed amount/grace days, so it never changes when the catalogue changes
- └── TenantUser (OWNER)  1   the school's owner account; logs in to the tenant app
-        (other staff users come later and are managed by the school itself, not here)
+ ├── Branch              1..n "Main Branch" created automatically; the school adds more in the tenant app
+ └── TenantUser (OWNER)  1   the school's owner account; logs in to the tenant app; works in ALL branches
+        (other staff users are managed by the school itself, not here)
 ```
 
 | Concept | Meaning | Key rules |
@@ -29,6 +30,7 @@ Tenant (driving school, DS code)       │
 | **Tenant** | A driving school. Identified by its government **DS code** (e.g. `DS119`). | `status` is `ACTIVE` or `CLOSED`. Never deleted. Closed tenants are read-only until reopened. |
 | **TenantAccess** | Whether the school may use the system (billing/suspension). | Created `ACTIVE` with the tenant. Separate from the tenant status and the owner's status. There are **no endpoints to change it yet** (suspension comes with billing). Display it read-only. |
 | **TenantSubscription** | The commercial agreement: which plan price, agreed amount, trial, grace period. | Always created **together with the tenant** (a tenant can't exist without one). History is kept: rows become `ENDED` / `CANCELLED`, they are never edited. Plan changes are **scheduled for the next renewal date**, never immediate. |
+| **Branch** | A physical branch of the school. | A **"Main Branch"** is created automatically with the tenant; its address, district and phone are copied from the tenant profile. After that it is the school's own data: the owner renames or edits it and creates more branches (up to the plan's `MAX_BRANCHES`) in the tenant app. Platform admins only **view** branches (§3.1). Editing the tenant profile later does **not** change any branch. |
 | **Owner** | The school's first and only `OWNER` user (`TenantUser` with role `OWNER`). | Created **together with the tenant**, with a temporary password chosen by the admin. On first login to the tenant app the owner must change it. Exactly one owner per tenant. Platform admins can edit, reset the password, disable or enable the owner. |
 
 ### Dependencies
@@ -36,9 +38,9 @@ Tenant (driving school, DS code)       │
 1. **A tenant needs an active plan price.** Creating a tenant requires a `planPriceId` that belongs to
    an **ACTIVE plan** and is itself an **ACTIVE price**. If the catalogue has no active plan, show
    an empty state with a link to the Plans screen.
-2. **Tenant, access, subscription and owner are created in one request** (`POST /platform/tenants`),
-   atomically: either everything is created or nothing is. There is no "draft tenant" or "add the
-   owner later" step.
+2. **Tenant, access, subscription, Main Branch and owner are created in one request**
+   (`POST /platform/tenants`), atomically: either everything is created or nothing is. There is no
+   "draft tenant" or "add the owner later" step, and no branch fields in the request.
 3. **Plan changes depend on the catalogue too:** scheduling a change also needs an active price of an
    active plan.
 4. **Closed tenants block** profile edits, subscription changes, grace-period changes and owner
@@ -228,6 +230,20 @@ the response.
 
 This single call feeds the whole detail page header plus the subscription and owner cards.
 
+#### Tenant branches (read-only)
+
+`GET /platform/tenants/:id/branches` · `TENANTS_READ` → `{ items: BranchResponse[] }`, oldest
+first (the Main Branch comes first), all statuses. `404 TENANT_NOT_FOUND`.
+
+```ts
+type BranchResponse = {
+  id: string; name: string; address: string; district: District;
+  phone: string;                     // "+94812223333"
+  status: 'ACTIVE' | 'CLOSED'; closedAt: string | null;
+  createdAt: string; updatedAt: string;
+};
+```
+
 #### Create tenant (onboarding)
 
 `POST /platform/tenants` · `TENANTS_MANAGE` + `SUBSCRIPTIONS_MANAGE` → `201 TenantDetailsResponse`
@@ -372,7 +388,7 @@ refresh that card.
 
 - `tenantId` (UUID) returns **every** entry about that tenant: its profile, its subscriptions and its
   owner. The backend guarantees that every tenant-related entry carries `tenantId`.
-- Combine it with `targetType` (`TENANT`, `TENANT_SUBSCRIPTION`, `TENANT_USER`), `action`, and
+- Combine it with `targetType` (`TENANT`, `TENANT_SUBSCRIPTION`, `TENANT_USER`, `BRANCH`), `action`, and
   `from`/`to` (ISO date-times) to narrow the results.
 - Results are newest first. For "Load more", pass `nextCursor` back as `cursor`; `null` means there
   are no more entries. `limit` is 1–100 (default 50).
@@ -398,6 +414,7 @@ Tenant-related actions:
 |---|---|
 | `TENANT` | `TENANT_CREATED`, `TENANT_UPDATED`, `TENANT_CLOSED`, `TENANT_REOPENED` |
 | `TENANT_SUBSCRIPTION` | `SUBSCRIPTION_CREATED`, `SUBSCRIPTION_CHANGE_SCHEDULED`, `SUBSCRIPTION_CANCELLED`, `SUBSCRIPTION_ACTIVATED`, `SUBSCRIPTION_ENDED`, `SUBSCRIPTION_GRACE_PERIOD_CHANGED` |
+| `BRANCH` | `BRANCH_CREATED` (the Main Branch, at onboarding) |
 | `TENANT_USER` | `TENANT_OWNER_CREATED`, `TENANT_OWNER_UPDATED`, `TENANT_OWNER_PASSWORD_RESET`, `TENANT_OWNER_DISABLED`, `TENANT_OWNER_ENABLED` |
 
 Render it as a timeline: an action label, "by {admin}" (or "System"), the time, and an expandable
@@ -438,6 +455,8 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
        wizard, no trial), "Edit grace period".
      - When `scheduledSubscription` exists, show a "Scheduled change" panel: new plan, amount,
        "Starts {startDate}", and a "Cancel change" button that asks for a reason.
+   - **Branches tab**: `GET /platform/tenants/:id/branches` table (name, district, phone, status
+     badge, created date). Read-only: schools manage their own branches.
    - **Subscription history tab**: `GET /subscriptions` table with status badges, start/end dates,
      amounts and cancellation reasons.
    - **Owner card**: name, email, phone, NIC, status badge, "Must change password" badge, last login.
@@ -473,7 +492,9 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
 ## 6. Not available yet (don't build UI for these)
 
 - Changing **tenant access** (suspend/restore), invoices and payments: they come with SaaS billing.
-- **Usage** against plan limits (staff/branches/instructors/vehicles counts).
+- **Usage** against plan limits (staff/branches/instructors/vehicles counts). The branches tab shows
+  the branch list but there is no usage summary endpoint yet.
+- Creating or editing **branches** from the admin dashboard: schools do this themselves.
 - **Tenant-specific limit overrides.**
 - **Owner transfer** or a second owner.
 - Managing tenant **staff users**: that is done by the school itself in the tenant app.

@@ -7,6 +7,7 @@ import {
   TenantRole,
   TenantStatus,
   TenantSubscriptionStatus,
+  TenantUserBranchAccess,
   TenantUserStatus,
 } from '../../src/generated/prisma/enums.js';
 import type {
@@ -256,6 +257,8 @@ export class InMemoryTenantUserRepository implements TenantUserRepository {
       passwordChangedAt: null,
       lastLoginAt: null,
       disabledAt: null,
+      branchAccess: TenantUserBranchAccess.SELECTED,
+      defaultBranchId: randomUUID(),
       createdByPlatformAdminId: randomUUID(),
       createdByTenantUserId: null,
       createdAt: now,
@@ -286,6 +289,7 @@ export class InMemoryTenantUserRepository implements TenantUserRepository {
       this.seedUser({
         ...input,
         role: TenantRole.OWNER,
+        branchAccess: TenantUserBranchAccess.ALL,
         mustChangePassword: true,
       }),
     );

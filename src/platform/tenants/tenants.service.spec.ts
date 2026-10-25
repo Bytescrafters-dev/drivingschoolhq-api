@@ -32,8 +32,8 @@ function createInput(planPriceId: string): CreateTenantInput {
 
 describe('TenantsService', () => {
   describe('createTenant', () => {
-    it('creates tenant, active access, subscription and owner, and audits each', async () => {
-      const { service, actor, subscribablePrice, users, audit } =
+    it('creates tenant, active access, subscription, Main Branch and owner, and audits each', async () => {
+      const { service, actor, subscribablePrice, users, branches, audit } =
         tenancySetup();
       const { price } = subscribablePrice();
 
@@ -64,9 +64,26 @@ describe('TenantsService', () => {
         createdByPlatformAdminId: actor.id,
       });
       expect(users.rows[0]!.passwordHash).toBe('hashed:Owner-Temp-Pass-1');
+      // The Main Branch copies the tenant's contact details; the owner works
+      // across all branches and starts in the Main Branch.
+      expect(branches.rows).toHaveLength(1);
+      const mainBranch = branches.rows[0]!;
+      expect(mainBranch).toMatchObject({
+        tenantId: details.tenant.id,
+        name: 'Main Branch',
+        address: details.tenant.address,
+        district: details.tenant.district,
+        phone: details.tenant.phone,
+        status: 'ACTIVE',
+      });
+      expect(users.rows[0]).toMatchObject({
+        branchAccess: 'ALL',
+        defaultBranchId: mainBranch.id,
+      });
       expect(audit.actions()).toEqual([
         PlatformAuditAction.TENANT_CREATED,
         PlatformAuditAction.SUBSCRIPTION_CREATED,
+        PlatformAuditAction.BRANCH_CREATED,
         PlatformAuditAction.TENANT_OWNER_CREATED,
       ]);
       // Every entry is attributed to the tenant so it can be filtered by tenant.
@@ -74,8 +91,12 @@ describe('TenantsService', () => {
         details.tenant.id,
         details.tenant.id,
         details.tenant.id,
+        details.tenant.id,
       ]);
       expect(audit.entries[2]).toMatchObject({
+        target: { type: 'BRANCH', id: mainBranch.id },
+      });
+      expect(audit.entries[3]).toMatchObject({
         target: { type: 'TENANT_USER', id: details.owner!.id },
         metadata: { email: details.owner!.email },
       });
