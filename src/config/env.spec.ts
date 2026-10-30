@@ -34,3 +34,41 @@ describe('validateEnv CORS_ORIGINS', () => {
     );
   });
 });
+
+describe('validateEnv TRUST_PROXY', () => {
+  it('trusts no proxy by default', () => {
+    expect(validateEnv(BASE).TRUST_PROXY).toBe(false);
+    expect(validateEnv({ ...BASE, TRUST_PROXY: '' }).TRUST_PROXY).toBe(false);
+    expect(validateEnv({ ...BASE, TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(
+      false,
+    );
+    expect(validateEnv({ ...BASE, TRUST_PROXY: '0' }).TRUST_PROXY).toBe(false);
+  });
+
+  it('accepts a hop count', () => {
+    expect(validateEnv({ ...BASE, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+  });
+
+  it('accepts a de-duplicated list of addresses, subnets and named ranges', () => {
+    expect(
+      validateEnv({
+        ...BASE,
+        TRUST_PROXY: ' 10.0.0.5, 10.1.0.0/16 ,loopback,::1,fd00::/8,10.0.0.5',
+      }).TRUST_PROXY,
+    ).toEqual(['10.0.0.5', '10.1.0.0/16', 'loopback', '::1', 'fd00::/8']);
+  });
+
+  it.each([
+    'true',
+    'everyone',
+    '10.0.0.300',
+    '10.0.0.0/33',
+    '::1/129',
+    '10.0.0.0/8/1',
+    '10.0.0.0/abc',
+  ])('rejects %s', (value) => {
+    expect(() => validateEnv({ ...BASE, TRUST_PROXY: value })).toThrow(
+      /TRUST_PROXY/,
+    );
+  });
+});

@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 export interface Env {
   DATABASE_URL: string;
   PLATFORM_JWT_SECRET: string;
@@ -12,7 +14,15 @@ export interface Env {
   JOBS_ENABLED: boolean;
   /** Browser origins allowed to call the API (exact match). Empty = CORS off. */
   CORS_ORIGINS: string[];
+  /**
+   * Which reverse proxies (e.g. the Next.js BFFs) are trusted to report the
+   * client IP via X-Forwarded-For: false (default), a hop count, or a list of
+   * proxy addresses/subnets. Rate limiting and audit IPs depend on it.
+   */
+  TRUST_PROXY: TrustProxy;
 }
+
+export type TrustProxy = false | number | string[];
 
 const MIN_JWT_SECRET_LENGTH = 32;
 
@@ -61,6 +71,54 @@ function origins(raw: unknown, name: string): string[] {
     }
   }
   return [...new Set(values)];
+}
+
+const NAMED_SUBNETS = new Set(['loopback', 'linklocal', 'uniquelocal']);
+
+function isAddressOrSubnet(value: string): boolean {
+  if (NAMED_SUBNETS.has(value)) return true;
+  const [address, prefix, extra] = value.split('/');
+  if (extra !== undefined || !address) return false;
+  const version = isIP(address);
+  if (version === 0) return false;
+  if (prefix === undefined) return true;
+  if (!/^[0-9]{1,3}$/.test(prefix)) return false;
+  return Number(prefix) <= (version === 4 ? 32 : 128);
+}
+
+/**
+ * "false"/empty: trust no proxy (request.ip is the socket address).
+ * "1", "2": trust that many proxy hops in front of the API.
+ * "10.0.0.5,10.1.0.0/16,loopback": trust only these proxy addresses.
+ * "true" (trust everyone) is rejected: any client could then spoof its IP
+ * and escape rate limiting.
+ */
+function trustProxy(raw: unknown, name: string): TrustProxy {
+  if (raw === undefined || raw === '' || raw === 'false') return false;
+  if (typeof raw !== 'string') throw new Error(`${name} must be a string`);
+  const value = raw.trim();
+  if (/^[0-9]+$/.test(value)) {
+    const hops = Number(value);
+    if (hops > 0) return hops;
+    return false;
+  }
+  if (value === 'true') {
+    throw new Error(
+      `${name}=true would trust any client's X-Forwarded-For; use a hop count or proxy addresses`,
+    );
+  }
+  const entries = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  for (const entry of entries) {
+    if (!isAddressOrSubnet(entry)) {
+      throw new Error(
+        `${name} must be false, a hop count, or a comma-separated list of IP addresses/subnets: ${entry}`,
+      );
+    }
+  }
+  return entries.length > 0 ? [...new Set(entries)] : false;
 }
 
 /** Validates process environment at boot; used by ConfigModule.forRoot. */
@@ -122,5 +180,6 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     ),
     JOBS_ENABLED: bool(raw.JOBS_ENABLED, 'JOBS_ENABLED', true),
     CORS_ORIGINS: origins(raw.CORS_ORIGINS, 'CORS_ORIGINS'),
+    TRUST_PROXY: trustProxy(raw.TRUST_PROXY, 'TRUST_PROXY'),
   };
 }

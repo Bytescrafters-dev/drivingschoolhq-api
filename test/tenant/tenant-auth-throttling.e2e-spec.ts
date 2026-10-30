@@ -14,12 +14,16 @@ describe('Tenant auth rate limiting (e2e)', () => {
 
   beforeAll(async () => {
     const { AppModule } = await import('../../src/app.module.js');
+    const { configureTrustProxy } =
+      await import('../../src/config/trust-proxy.js');
     prisma = createTestPrisma();
     await resetDatabase(prisma);
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
     app = moduleRef.createNestApplication();
+    // TRUST_PROXY is off (the default), exactly as main.ts would apply it.
+    configureTrustProxy(app);
     await app.init();
   });
 
@@ -28,14 +32,18 @@ describe('Tenant auth rate limiting (e2e)', () => {
     await prisma.$disconnect();
   });
 
-  it('throttles repeated tenant login attempts', async () => {
-    const attempt = () =>
-      request(app.getHttpServer()).post('/tenant/auth/login').send({
-        dsCode: 'DS404',
-        email: 'nobody@school.lk',
-        password: 'whatever-password',
-      });
-    for (let i = 0; i < 3; i++) await attempt().expect(401);
-    await attempt().expect(429);
+  it('throttles repeated tenant login attempts, ignoring forged client IPs', async () => {
+    const attempt = (i: number) =>
+      request(app.getHttpServer())
+        .post('/tenant/auth/login')
+        // Without a trusted proxy a client cannot pick its own IP.
+        .set('X-Forwarded-For', `203.0.113.${i}`)
+        .send({
+          dsCode: 'DS404',
+          email: 'nobody@school.lk',
+          password: 'whatever-password',
+        });
+    for (let i = 0; i < 3; i++) await attempt(i).expect(401);
+    await attempt(3).expect(429);
   });
 });

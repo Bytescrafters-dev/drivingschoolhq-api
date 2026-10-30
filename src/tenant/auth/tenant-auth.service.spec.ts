@@ -49,6 +49,7 @@ function actorOf(
     id: string;
     tenantId: string;
     email: string;
+    role?: TenantRole;
     branchAccess: TenantUserBranchAccess;
     defaultBranchId: string;
   },
@@ -59,7 +60,7 @@ function actorOf(
     tenantId: user.tenantId,
     email: user.email,
     fullName: 'Owner',
-    role: TenantRole.OWNER,
+    role: user.role ?? TenantRole.OWNER,
     sessionId,
     mustChangePassword: false,
     branchAccess: user.branchAccess,
@@ -353,6 +354,21 @@ describe('TenantAuthService', () => {
       expect(me.branches.branches.map((b) => b.id)).toEqual([kandy.id]);
       expect(me.branches.defaultBranchId).toBe(kandy.id);
       expect(mainBranch.id).not.toBe(kandy.id);
+    });
+
+    it("returns the permissions of the user's role", async () => {
+      const { service, users, user, tenant } = withUser();
+      const clerk = users.seedUser({
+        tenantId: tenant.id,
+        role: TenantRole.FRONT_DESK,
+      });
+
+      expect(
+        (await service.me(actorOf(user, crypto.randomUUID()))).permissions,
+      ).toEqual(['BRANCHES_MANAGE']);
+      expect(
+        (await service.me(actorOf(clerk, crypto.randomUUID()))).permissions,
+      ).toEqual([]);
     });
   });
 });

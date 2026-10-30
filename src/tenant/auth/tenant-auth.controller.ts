@@ -81,7 +81,7 @@ export class TenantAuthController {
   @TenantAuth()
   @TenantAllowPasswordChangeRequired()
   async me(@CurrentTenantUser() actor: AuthenticatedTenantUser) {
-    const { user, tenant, branches } = await this.auth.me(actor);
+    const { user, tenant, branches, permissions } = await this.auth.me(actor);
     return {
       user: {
         id: user.id,
@@ -92,6 +92,8 @@ export class TenantAuthController {
         branchAccess: user.branchAccess,
         /** Branch to open after login; null when no branch is workable. */
         defaultBranchId: branches.defaultBranchId,
+        /** UX hint only; every endpoint enforces its own permission. */
+        permissions: [...permissions],
       },
       tenant: {
         id: tenant.id,

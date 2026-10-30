@@ -73,6 +73,7 @@ type Me = {
     mustChangePassword: boolean;
     branchAccess: 'ALL' | 'SELECTED';
     defaultBranchId: string | null;      // branch to open after login; null = no workable branch
+    permissions: ('BRANCHES_MANAGE')[];  // UX only; grows as features are added
   };
   tenant: { id: string; dsCode: string; displayName: string;
             accessStatus: 'ACTIVE' | 'GRACE_PERIOD' | 'SUSPENDED' | null };
@@ -125,7 +126,7 @@ first workable branch.
 
 - **Viewing:** every user can list and view **the branches they can access**.
 - **Creating, editing, closing and reopening:** OWNER and ADMIN only (`403 TENANT_PERMISSION_DENIED`
-  otherwise). Hide those actions for other roles; `me.user.role` tells you which they are.
+  otherwise). Hide those actions unless `me.user.permissions` includes `BRANCHES_MANAGE`.
   - **Create:** any OWNER/ADMIN can create a branch. An ADMIN with `SELECTED` access is
     automatically assigned to the branch they create.
   - **Edit, close and reopen:** only for branches the user can access. A `SELECTED` admin doesn't
@@ -212,7 +213,9 @@ type BranchResponse = {
 
 ## 7. Backend notes
 
-- Local API: `http://localhost:8001`. CORS allows only origins in the backend's `CORS_ORIGINS`. The
-  tenant app's origin must be added there (the admin dashboard uses `http://localhost:3000`). Bearer
-  tokens only, no cookies.
+- Local API: `http://localhost:8001`. The tenant app calls it only through its Next.js BFF
+  (`/api/auth/*`, `/api/proxy/*`; see `tenant-auth-plan.md`), server-to-server. CORS is therefore
+  not involved, and the tenant app's origin does **not** need to be in the API's `CORS_ORIGINS`.
+  The BFF must forward `X-Branch-Id`, the browser's `User-Agent`, and the client IP as
+  `X-Forwarded-For` (the API trusts it per `TRUST_PROXY`).
 - Platform tokens never work on `/tenant/*` and tenant tokens never work on `/platform/*`.

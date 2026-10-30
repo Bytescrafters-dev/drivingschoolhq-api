@@ -35,6 +35,8 @@ import {
   type MyBranches,
 } from '../branches/branch-access.service.js';
 import { TenantTokenService } from './tenant-token.service.js';
+import type { TenantPermission } from '../permissions/tenant-permission.js';
+import { TENANT_ROLE_PERMISSIONS } from '../permissions/tenant-role-permissions.js';
 
 export interface TenantAuthTokens {
   tokenType: 'Bearer';
@@ -49,6 +51,8 @@ export interface TenantMe {
   user: AuthenticatedTenantUser;
   tenant: TenantContext;
   branches: MyBranches;
+  /** What the user's role may do (for UX; the API still enforces it). */
+  permissions: readonly TenantPermission[];
 }
 
 type FailedLoginReason =
@@ -291,6 +295,7 @@ export class TenantAuthService {
       user: actor,
       tenant,
       branches: await this.branches.myBranches(actor),
+      permissions: TENANT_ROLE_PERMISSIONS[actor.role],
     };
   }
 

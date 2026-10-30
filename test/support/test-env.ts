@@ -38,6 +38,8 @@ export function applyTestEnv(): void {
     'test-tenant-jwt-secret-at-least-32-characters!';
   process.env.AUTH_RATE_LIMIT = '1000';
   process.env.AUTH_RATE_WINDOW_SECONDS = '60';
+  // Tests that need a trusted proxy opt in explicitly.
+  process.env.TRUST_PROXY = 'false';
   // Background jobs would race with test fixtures; tests invoke them directly.
   process.env.JOBS_ENABLED = 'false';
 }
