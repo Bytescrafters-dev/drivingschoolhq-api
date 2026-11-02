@@ -48,6 +48,16 @@ export class BranchAccessService {
     return branch?.status === BranchStatus.ACTIVE ? branch : null;
   }
 
+  /**
+   * False for a SELECTED user none of whose branches is ACTIVE: they may not
+   * sign in. ALL users always have one (a tenant keeps an ACTIVE branch).
+   */
+  hasWorkableBranch(
+    user: Pick<AuthenticatedTenantUser, 'id' | 'tenantId' | 'branchAccess'>,
+  ): Promise<boolean> {
+    return this.branches.hasActiveAccessible(viewerOf(user));
+  }
+
   async myBranches(user: AuthenticatedTenantUser): Promise<MyBranches> {
     const branches = await this.branches.listAccessible(viewerOf(user), {
       includeClosed: false,

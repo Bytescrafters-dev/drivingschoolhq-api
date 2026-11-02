@@ -17,7 +17,10 @@ import {
   FakeTenantAuditRepository,
   InMemoryTenantContextRepository,
 } from '../../../test/support/tenant-auth-fakes.js';
-import { InMemoryTenantUserRepository } from '../../../test/support/tenancy-fakes.js';
+import {
+  FakeTenantSessionsService,
+  InMemoryTenantUserRepository,
+} from '../../../test/support/tenancy-fakes.js';
 import { TenantAuditService } from '../audit/tenant-audit.service.js';
 import type { AuthenticatedTenantUser } from '../auth/interfaces/authenticated-tenant-user.js';
 import { BranchAccessService } from './branch-access.service.js';
@@ -43,6 +46,7 @@ function setup(options: { maxBranches?: number | null } = {}) {
     findActiveLimit: () => Promise.resolve(limits.maxBranches),
   });
   const clock = new FixedClock();
+  const sessions = new FakeTenantSessionsService();
   const service = new BranchesService(
     branches,
     tenants,
@@ -51,6 +55,7 @@ function setup(options: { maxBranches?: number | null } = {}) {
     new TenantAuditService(auditRepo),
     passthroughTx,
     clock,
+    sessions.asService(),
   );
   const tenant = tenants.seed();
   const main = branches.seed({ tenantId: tenant.id, name: 'Main Branch' });
@@ -100,6 +105,7 @@ function setup(options: { maxBranches?: number | null } = {}) {
     users,
     branches,
     auditRepo,
+    sessions,
     limits,
     clock,
     tenant,
@@ -276,27 +282,43 @@ describe('BranchesService', () => {
       );
     });
 
-    it('refuses while it is an active staff member’s only branch', async () => {
-      const { service, owner, user, actor, branches, tenant } = setup();
+    it('locks out active staff for whom it was the only active branch', async () => {
+      const { service, owner, user, actor, branches, tenant, sessions, main } =
+        setup();
       const kandy = branches.seed({ tenantId: tenant.id, name: 'Kandy' });
-      user({
+      const onlyKandy = user({
         role: TenantRole.FRONT_DESK,
         branchAccess: TenantUserBranchAccess.SELECTED,
         branchIds: [kandy.id],
       });
-      // Disabled staff and staff with another active branch do not block.
+      // Disabled staff and staff with another active branch are not affected.
       user({
         role: TenantRole.FRONT_DESK,
         branchAccess: TenantUserBranchAccess.SELECTED,
         branchIds: [kandy.id],
         status: TenantUserStatus.DISABLED,
       });
+      user({
+        role: TenantRole.FRONT_DESK,
+        branchAccess: TenantUserBranchAccess.SELECTED,
+        branchIds: [kandy.id, main.id],
+      });
 
-      const error = await expectAppError(
-        service.close(actor(owner), kandy.id, META),
-        'BRANCH_HAS_EXCLUSIVE_STAFF',
+      const { branch, lockedOutStaff } = await service.close(
+        actor(owner),
+        kandy.id,
+        META,
       );
-      expect(error.message).toContain('Seeded User');
+
+      expect(branch.status).toBe(BranchStatus.CLOSED);
+      expect(lockedOutStaff.map((u) => u.id)).toEqual([onlyKandy.id]);
+      expect(sessions.revocations).toEqual([
+        {
+          tenantId: tenant.id,
+          userId: onlyKandy.id,
+          reason: 'NO_ACTIVE_BRANCH',
+        },
+      ]);
     });
 
     it('closes, moves defaults to another accessible branch, and audits', async () => {
@@ -311,10 +333,15 @@ describe('BranchesService', () => {
         branchIds: [kandy.id, galle.id],
       });
 
-      const closed = await service.close(actor(owner), kandy.id, META);
+      const { branch: closed, lockedOutStaff } = await service.close(
+        actor(owner),
+        kandy.id,
+        META,
+      );
 
       expect(closed).toMatchObject({ status: BranchStatus.CLOSED });
       expect(closed.closedAt).not.toBeNull();
+      expect(lockedOutStaff).toEqual([]);
       const row = (id: string) => users.rows.find((u) => u.id === id)!;
       expect(row(allAccess.id).defaultBranchId).toBe(main.id);
       expect(row(selected.id).defaultBranchId).toBe(galle.id);

@@ -8,8 +8,8 @@ export const TENANT_ROLE_PERMISSIONS: Readonly<
   Record<TenantRole, readonly P[]>
 > = {
   [TenantRole.OWNER]: ALL_PERMISSIONS,
-  [TenantRole.ADMIN]: [P.BRANCHES_MANAGE],
-  [TenantRole.BRANCH_MANAGER]: [],
+  [TenantRole.ADMIN]: [P.BRANCHES_MANAGE, P.STAFF_MANAGE],
+  [TenantRole.BRANCH_MANAGER]: [P.STAFF_MANAGE],
   [TenantRole.FRONT_DESK]: [],
   [TenantRole.INSTRUCTOR]: [],
   [TenantRole.ACCOUNTANT]: [],

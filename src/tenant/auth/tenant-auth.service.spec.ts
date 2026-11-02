@@ -179,6 +179,44 @@ describe('TenantAuthService', () => {
       expect(closed.sessions.rows).toHaveLength(0);
     });
 
+    it('refuses SELECTED staff none of whose branches is open, after the password check', async () => {
+      const { service, users, branches, tenant, auditRepo, sessions } =
+        withUser();
+      const kandy = branches.seed({
+        tenantId: tenant.id,
+        name: 'Kandy',
+        status: BranchStatus.CLOSED,
+        closedAt: new Date(),
+      });
+      const clerk = users.seedUser({
+        tenantId: tenant.id,
+        email: 'clerk@school.lk',
+        role: TenantRole.FRONT_DESK,
+        branchAccess: TenantUserBranchAccess.SELECTED,
+        defaultBranchId: kandy.id,
+        passwordHash: `hashed:${PASSWORD}`,
+      });
+      branches.assign(tenant.id, clerk.id, kandy.id);
+
+      await expectAppError(
+        service.login('DS1', 'clerk@school.lk', 'wrong', META),
+        'INVALID_CREDENTIALS',
+      );
+      await expectAppError(
+        service.login('DS1', 'clerk@school.lk', PASSWORD, META),
+        'NO_ACTIVE_BRANCH',
+      );
+      expect(sessions.rows).toHaveLength(0);
+      expect(auditRepo.entries.at(-1)).toMatchObject({
+        action: TenantAuditAction.LOGIN_FAILED,
+        metadata: { reason: 'NO_ACTIVE_BRANCH' },
+      });
+
+      // Reopening the branch lets them in again.
+      await branches.setStatus(tenant.id, kandy.id, BranchStatus.ACTIVE, null);
+      await service.login('DS1', 'clerk@school.lk', PASSWORD, META);
+    });
+
     it('never writes the password to the audit log', async () => {
       const { service, auditRepo } = withUser();
       await service
@@ -249,6 +287,36 @@ describe('TenantAuthService', () => {
       await expectAppError(
         service.refresh(b.refreshToken, META),
         'INVALID_REFRESH_TOKEN',
+      );
+    });
+
+    it('refuses to refresh once none of a SELECTED user’s branches is open', async () => {
+      const { service, users, branches, tenant, mainBranch } = withUser();
+      const clerk = users.seedUser({
+        tenantId: tenant.id,
+        email: 'clerk@school.lk',
+        role: TenantRole.FRONT_DESK,
+        branchAccess: TenantUserBranchAccess.SELECTED,
+        defaultBranchId: mainBranch.id,
+        passwordHash: `hashed:${PASSWORD}`,
+      });
+      branches.assign(tenant.id, clerk.id, mainBranch.id);
+      const tokens = await service.login(
+        'DS1',
+        'clerk@school.lk',
+        PASSWORD,
+        META,
+      );
+
+      await branches.setStatus(
+        tenant.id,
+        mainBranch.id,
+        BranchStatus.CLOSED,
+        new Date(),
+      );
+      await expectAppError(
+        service.refresh(tokens.refreshToken, META),
+        'NO_ACTIVE_BRANCH',
       );
     });
   });
@@ -356,6 +424,13 @@ describe('TenantAuthService', () => {
       expect(mainBranch.id).not.toBe(kandy.id);
     });
 
+    it('returns the current phone', async () => {
+      const { service, users, user } = withUser();
+      users.rows.find((u) => u.id === user.id)!.phone = '+94771234567';
+      const me = await service.me(actorOf(user, crypto.randomUUID()));
+      expect(me.phone).toBe('+94771234567');
+    });
+
     it("returns the permissions of the user's role", async () => {
       const { service, users, user, tenant } = withUser();
       const clerk = users.seedUser({
@@ -365,7 +440,7 @@ describe('TenantAuthService', () => {
 
       expect(
         (await service.me(actorOf(user, crypto.randomUUID()))).permissions,
-      ).toEqual(['BRANCHES_MANAGE']);
+      ).toEqual(['BRANCHES_MANAGE', 'STAFF_MANAGE']);
       expect(
         (await service.me(actorOf(clerk, crypto.randomUUID()))).permissions,
       ).toEqual([]);

@@ -7,7 +7,6 @@ import {
   PlanLimitCode,
   TenantRole,
   TenantUserBranchAccess,
-  TenantUserStatus,
 } from '../../src/generated/prisma/enums.js';
 import type { AuthenticatedTenantUser } from '../../src/tenant/auth/interfaces/authenticated-tenant-user.js';
 import { BranchesService } from '../../src/tenant/branches/branches.service.js';
@@ -185,7 +184,7 @@ describe('Branch persistence (real database)', () => {
     expect(await repo.countActive(tenant.id)).toBe(1);
   });
 
-  it('finds exclusive staff and moves defaults when a branch closes', async () => {
+  it('locks out staff whose last open branch closes and moves defaults', async () => {
     const { admin, tenant, main, owner } = await school();
     const kandy = await createBranch(prisma, { tenantId: tenant.id });
     const galle = await createBranch(prisma, { tenantId: tenant.id });
@@ -200,7 +199,7 @@ describe('Branch persistence (real database)', () => {
         ...args,
       });
 
-    // Only Kandy → blocks closing Kandy.
+    // Only Kandy → loses access when Kandy closes.
     const onlyKandy = await make({
       branchAccess: TenantUserBranchAccess.SELECTED,
       defaultBranchId: kandy.id,
@@ -208,10 +207,13 @@ describe('Branch persistence (real database)', () => {
     expect(
       (await repo.findExclusiveUsers(tenant.id, kandy.id)).map((u) => u.id),
     ).toEqual([onlyKandy.id]);
-    // Disabling them removes the blocker.
-    await prisma.tenantUser.update({
-      where: { id: onlyKandy.id },
-      data: { status: TenantUserStatus.DISABLED, disabledAt: new Date() },
+    const session = await prisma.tenantUserSession.create({
+      data: {
+        tenantId: tenant.id,
+        userId: onlyKandy.id,
+        refreshTokenHash: crypto.randomUUID(),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
     });
 
     // Kandy + Galle (SELECTED) → moves to Galle; ALL → moves to the oldest
@@ -232,14 +234,24 @@ describe('Branch persistence (real database)', () => {
       defaultBranchId: kandy.id,
     });
 
-    await service.close(actorOf(owner), kandy.id, META);
+    const { lockedOutStaff } = await service.close(
+      actorOf(owner),
+      kandy.id,
+      META,
+    );
+    expect(lockedOutStaff.map((u) => u.id)).toEqual([onlyKandy.id]);
+    expect(
+      await prisma.tenantUserSession.findUniqueOrThrow({
+        where: { id: session.id },
+      }),
+    ).toMatchObject({ revokedReason: 'NO_ACTIVE_BRANCH' });
 
     const defaultOf = async (id: string) =>
       (await prisma.tenantUser.findUniqueOrThrow({ where: { id } }))
         .defaultBranchId;
     expect(await defaultOf(kandyAndGalle.id)).toBe(galle.id);
     expect(await defaultOf(all.id)).toBe(main.id);
-    // No other accessible branch: the disabled user keeps the closed default.
+    // No other accessible branch: the locked-out user keeps the closed default.
     expect(await defaultOf(onlyKandy.id)).toBe(kandy.id);
     expect(
       (await prisma.branch.findUniqueOrThrow({ where: { id: kandy.id } }))
@@ -250,7 +262,7 @@ describe('Branch persistence (real database)', () => {
     });
     expect(audit).toMatchObject({
       branchId: kandy.id,
-      metadata: { reassignedDefaults: 2 },
+      metadata: { reassignedDefaults: 2, lockedOutUserIds: [onlyKandy.id] },
     });
   });
 });

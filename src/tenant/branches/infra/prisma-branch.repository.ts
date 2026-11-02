@@ -130,6 +130,14 @@ export class PrismaBranchRepository implements BranchRepository {
     });
   }
 
+  async hasActiveAccessible(viewer: BranchViewer): Promise<boolean> {
+    const branch = await this.tx.client.branch.findFirst({
+      where: { ...accessibleWhere(viewer), status: BranchStatus.ACTIVE },
+      select: { id: true },
+    });
+    return branch !== null;
+  }
+
   async updateDetails(
     tenantId: string,
     branchId: string,

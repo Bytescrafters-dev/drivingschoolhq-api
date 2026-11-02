@@ -123,6 +123,11 @@ export class InMemoryBranchRepository implements BranchRepository {
       (b) => b.tenantId === tenantId && b.status === BranchStatus.ACTIVE,
     ).length;
   }
+  async hasActiveAccessible(viewer: BranchViewer) {
+    return this.rows.some(
+      (b) => b.status === BranchStatus.ACTIVE && this.accessible(viewer, b),
+    );
+  }
   async updateDetails(
     tenantId: string,
     branchId: string,

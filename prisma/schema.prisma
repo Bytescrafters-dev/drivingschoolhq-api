@@ -566,6 +566,8 @@ enum TenantSessionRevokedReason {
   EMAIL_CHANGED
   TENANT_CLOSED
   REFRESH_TOKEN_REUSE
+  /// The user's last ACTIVE branch was closed (SELECTED access).
+  NO_ACTIVE_BRANCH
 }
 
 /// One login session of a tenant user. Holds the hash of the current refresh

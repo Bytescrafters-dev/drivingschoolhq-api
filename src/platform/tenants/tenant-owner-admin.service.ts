@@ -115,6 +115,10 @@ export class TenantOwnerAdminService {
     });
   }
 
+  /**
+   * Never blocked by MAX_STAFF_USERS, so a school is never locked out of its
+   * owner. The owner still occupies a seat once active again.
+   */
   async enable(
     actor: AuthenticatedPlatformAdmin,
     tenantId: string,

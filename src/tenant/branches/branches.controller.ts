@@ -88,8 +88,17 @@ export class BranchesController {
     @CurrentTenantUser() actor: AuthenticatedTenantUser,
     @Param('id', ParseUUIDPipe) id: string,
     @ReqMeta() meta: RequestMeta,
-  ): Promise<BranchResponse> {
-    return toBranchResponse(await this.branches.close(actor, id, meta));
+  ) {
+    const { branch, lockedOutStaff } = await this.branches.close(
+      actor,
+      id,
+      meta,
+    );
+    return {
+      ...toBranchResponse(branch),
+      /** Staff signed out because this was their only active branch. */
+      lockedOutStaff,
+    };
   }
 
   @Post(':id/reopen')

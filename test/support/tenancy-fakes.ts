@@ -328,6 +328,19 @@ export class InMemoryTenantUserRepository implements TenantUserRepository {
     });
     return this.view(owner);
   }
+  async findById(tenantId: string, id: string) {
+    const row = this.rows.find((r) => r.tenantId === tenantId && r.id === id);
+    return row ? this.view(row) : null;
+  }
+  async updateOwnProfile(
+    tenantId: string,
+    id: string,
+    change: { fullName?: string; phone?: string | null },
+  ) {
+    const row = this.rows.find((r) => r.tenantId === tenantId && r.id === id)!;
+    Object.assign(row, change);
+    return this.view(row);
+  }
   async findCredentialsByEmail(tenantId: string, email: string) {
     const row = this.rows.find(
       (r) => r.tenantId === tenantId && r.email === email,

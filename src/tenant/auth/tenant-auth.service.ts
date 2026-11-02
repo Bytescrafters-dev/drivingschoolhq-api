@@ -49,6 +49,8 @@ export interface TenantAuthTokens {
 
 export interface TenantMe {
   user: AuthenticatedTenantUser;
+  /** Current phone (not part of the session principal). */
+  phone: string | null;
   tenant: TenantContext;
   branches: MyBranches;
   /** What the user's role may do (for UX; the API still enforces it). */
@@ -56,13 +58,18 @@ export interface TenantMe {
 }
 
 type FailedLoginReason =
-  'UNKNOWN_EMAIL' | 'INVALID_PASSWORD' | 'USER_DISABLED' | 'TENANT_CLOSED';
+  | 'UNKNOWN_EMAIL'
+  | 'INVALID_PASSWORD'
+  | 'USER_DISABLED'
+  | 'TENANT_CLOSED'
+  | 'NO_ACTIVE_BRANCH';
 
 /**
  * Tenant user authentication: DS code + email + password, rotating refresh
  * tokens with reuse detection, forced change of temporary passwords.
  * Suspended tenants (billing) may still sign in; business access is enforced
- * separately. Closed tenants cannot sign in.
+ * separately. Closed tenants cannot sign in, nor can SELECTED users none of
+ * whose branches is ACTIVE (until one is reopened or another is assigned).
  */
 @Injectable()
 export class TenantAuthService {
@@ -138,6 +145,16 @@ export class TenantAuthService {
       );
       throw tenantClosed();
     }
+    if (!(await this.branches.hasWorkableBranch(user))) {
+      await this.recordFailedLogin(
+        tenant.id,
+        normalizedEmail,
+        user.id,
+        'NO_ACTIVE_BRANCH',
+        meta,
+      );
+      throw noActiveBranch();
+    }
 
     return this.tx.run(async () => {
       const now = this.clock.now();
@@ -194,6 +211,9 @@ export class TenantAuthService {
       tenant.status === TenantStatus.CLOSED
     ) {
       throw invalidRefreshToken();
+    }
+    if (!(await this.branches.hasWorkableBranch(credentials.user))) {
+      throw noActiveBranch();
     }
 
     return this.tx.run(async () => {
@@ -283,8 +303,11 @@ export class TenantAuthService {
   }
 
   async me(actor: AuthenticatedTenantUser): Promise<TenantMe> {
-    const tenant = await this.tenants.findById(actor.tenantId);
-    if (!tenant) {
+    const [tenant, profile] = await Promise.all([
+      this.tenants.findById(actor.tenantId),
+      this.users.findById(actor.tenantId, actor.id),
+    ]);
+    if (!tenant || !profile) {
       throw new AppError(
         'UNAUTHORIZED',
         'SESSION_INVALID',
@@ -293,6 +316,7 @@ export class TenantAuthService {
     }
     return {
       user: actor,
+      phone: profile.phone,
       tenant,
       branches: await this.branches.myBranches(actor),
       permissions: TENANT_ROLE_PERMISSIONS[actor.role],
@@ -380,6 +404,14 @@ function tenantClosed(): AppError {
     'FORBIDDEN',
     'TENANT_CLOSED',
     'This driving school account has been closed',
+  );
+}
+
+function noActiveBranch(): AppError {
+  return new AppError(
+    'FORBIDDEN',
+    'NO_ACTIVE_BRANCH',
+    'None of your branches is open. Ask your school owner or admin for access to an active branch',
   );
 }
 

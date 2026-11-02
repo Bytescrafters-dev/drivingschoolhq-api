@@ -178,7 +178,7 @@ describe('Tenant branches (e2e)', () => {
       .expect(200);
     expect(me.body.user).toMatchObject({
       branchAccess: 'ALL',
-      permissions: ['BRANCHES_MANAGE'],
+      permissions: ['BRANCHES_MANAGE', 'STAFF_MANAGE'],
     });
     expect(me.body.branches).toEqual([
       {
@@ -346,15 +346,6 @@ describe('Tenant branches (e2e)', () => {
       .expect(403)
       .expect(({ body }) => expect(body.code).toBe('TENANT_PERMISSION_DENIED'));
 
-    // Kandy is the clerk's only branch, so it cannot be closed yet.
-    await http()
-      .post(`/tenant/branches/${kandy.id}/close`)
-      .set(bearer(token))
-      .expect(409)
-      .expect(({ body }) =>
-        expect(body.code).toBe('BRANCH_HAS_EXCLUSIVE_STAFF'),
-      );
-
     // A SELECTED admin creates a branch, is assigned to it, but cannot
     // close a branch outside their access.
     const admin = await staff('DS1', tenantId, {
@@ -378,6 +369,34 @@ describe('Tenant branches (e2e)', () => {
       .post(`/tenant/branches/${galle.id}/close`)
       .set(bearer(admin.token))
       .expect(200);
+
+    // Kandy is now the only open branch of both the clerk and the admin:
+    // closing it signs them out, and they cannot sign in until it reopens.
+    const closed = await http()
+      .post(`/tenant/branches/${kandy.id}/close`)
+      .set(bearer(token))
+      .expect(200);
+    expect(
+      closed.body.lockedOutStaff.map((u: { id: string }) => u.id).sort(),
+    ).toEqual([clerk.user.id, admin.user.id].sort());
+    await http().get('/tenant/auth/me').set(bearer(clerk.token)).expect(401);
+    await http()
+      .post('/tenant/auth/login')
+      .send({
+        dsCode: 'DS1',
+        email: clerk.user.email,
+        password: STAFF_PASSWORD,
+      })
+      .expect(403)
+      .expect(({ body }) => expect(body.code).toBe('NO_ACTIVE_BRANCH'));
+    // The owner (ALL access) is unaffected.
+    await http().get('/tenant/auth/me').set(bearer(token)).expect(200);
+
+    await http()
+      .post(`/tenant/branches/${kandy.id}/reopen`)
+      .set(bearer(token))
+      .expect(200);
+    await login('DS1', clerk.user.email, STAFF_PASSWORD);
   });
 
   it('a platform downgrade never closes branches but blocks new ones', async () => {

@@ -42,7 +42,7 @@ export interface BranchViewer {
   branchAccess: TenantUserBranchAccess;
 }
 
-/** A staff member who can only work in one (active) branch. */
+/** An active staff member whose only ACTIVE branch is a given branch. */
 export interface ExclusiveBranchUser {
   id: string;
   fullName: string;
@@ -76,6 +76,8 @@ export interface BranchRepository {
     branchId: string,
   ): Promise<Branch | null>;
   countActive(tenantId: string): Promise<number>;
+  /** Whether the viewer can work in at least one ACTIVE branch. */
+  hasActiveAccessible(viewer: BranchViewer): Promise<boolean>;
   /** Throws AppError BRANCH_NAME_TAKEN for a duplicate name (any case). */
   updateDetails(
     tenantId: string,

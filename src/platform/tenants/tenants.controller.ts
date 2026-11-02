@@ -31,12 +31,17 @@ import {
   toTenantListItemResponse,
 } from './interfaces/tenant.response.js';
 import { toBranchResponse } from '../../tenant/branches/interfaces/branch.response.js';
+import { toStaffResponse } from '../../tenant/staff/interfaces/staff.response.js';
+import { TenantUsersAdminService } from './tenant-users-admin.service.js';
 import { TenantsService } from './tenants.service.js';
 
 @Controller('platform/tenants')
 @PlatformAuth()
 export class TenantsController {
-  constructor(private readonly tenants: TenantsService) {}
+  constructor(
+    private readonly tenants: TenantsService,
+    private readonly tenantUsers: TenantUsersAdminService,
+  ) {}
 
   @Get()
   @RequirePlatformPermissions(PlatformPermission.TENANTS_READ)
@@ -64,6 +69,18 @@ export class TenantsController {
   async branches(@Param('id', ParseUUIDPipe) id: string) {
     const branches = await this.tenants.listBranches(id);
     return { items: branches.map(toBranchResponse) };
+  }
+
+  /** All users of the school (owner first) and seat usage. Read-only. */
+  @Get(':id/users')
+  @RequirePlatformPermissions(PlatformPermission.TENANTS_READ)
+  async users(@Param('id', ParseUUIDPipe) id: string) {
+    const overview = await this.tenantUsers.overview(id);
+    return {
+      items: overview.users.map(toStaffResponse),
+      seatsUsed: overview.seatsUsed,
+      seatLimit: overview.seatLimit,
+    };
   }
 
   @Post()

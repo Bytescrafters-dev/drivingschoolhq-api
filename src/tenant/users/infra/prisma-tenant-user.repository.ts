@@ -10,6 +10,7 @@ import { violatedUniqueIndex } from '../../../prisma/prisma-errors.js';
 import { TransactionManager } from '../../../prisma/transaction-manager.js';
 import type {
   NewTenantOwner,
+  OwnProfileChange,
   TenantOwnerProfileChange,
   TenantUser,
   TenantUserCredentials,
@@ -132,6 +133,25 @@ export class PrismaTenantUserRepository implements TenantUserRepository {
     return this.updateOwner(tenantId, {
       status: TenantUserStatus.ACTIVE,
       disabledAt: null,
+    });
+  }
+
+  findById(tenantId: string, id: string): Promise<TenantUser | null> {
+    return this.tx.client.tenantUser.findUnique({
+      where: { tenantId_id: { tenantId, id } },
+      select: TENANT_USER_SELECT,
+    });
+  }
+
+  updateOwnProfile(
+    tenantId: string,
+    id: string,
+    change: OwnProfileChange,
+  ): Promise<TenantUser> {
+    return this.tx.client.tenantUser.update({
+      where: { tenantId_id: { tenantId, id } },
+      data: change,
+      select: TENANT_USER_SELECT,
     });
   }
 

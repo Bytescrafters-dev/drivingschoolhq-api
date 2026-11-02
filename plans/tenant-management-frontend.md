@@ -230,6 +230,38 @@ the response.
 
 This single call feeds the whole detail page header plus the subscription and owner cards.
 
+#### Tenant users and seats (read-only)
+
+`GET /platform/tenants/:id/users` · `TENANTS_READ` →
+`{ items: TenantUserResponse[], seatsUsed: number, seatLimit: number | null }`.
+- `items`: every user of the school, the **owner first**, then the rest by creation date, any status.
+- `seatsUsed`: ACTIVE users, the owner included.
+- `seatLimit`: the plan's `MAX_STAFF_USERS`. `null` means unlimited; `0` means there is no active
+  subscription.
+- `404 TENANT_NOT_FOUND`.
+
+```ts
+type TenantUserResponse = {
+  id: string; email: string; fullName: string;
+  phone: string | null; nic: string | null;
+  role: 'OWNER' | 'ADMIN' | 'BRANCH_MANAGER' | 'FRONT_DESK' | 'INSTRUCTOR' | 'ACCOUNTANT';
+  status: 'ACTIVE' | 'DISABLED';
+  mustChangePassword: boolean;
+  lastLoginAt: string | null; disabledAt: string | null;
+  branchAccess: 'ALL' | 'SELECTED';
+  branches: { id: string; name: string; status: 'ACTIVE' | 'CLOSED' }[];  // SELECTED only
+  defaultBranchId: string;
+  hasActiveBranch: boolean;          // false → this user cannot sign in until a branch reopens
+  createdAt: string; updatedAt: string;
+};
+```
+
+Staff are managed by the school in the tenant app. The platform only manages the **owner**, through
+the owner endpoints. **Re-enabling a disabled owner is never blocked by the seat limit**, so a school
+can't be locked out of its owner, but the owner then takes a seat again. When that pushes
+`seatsUsed` above `seatLimit`, nobody is disabled; the school just can't add or re-enable staff until
+it is back under the limit.
+
 #### Tenant branches (read-only)
 
 `GET /platform/tenants/:id/branches` · `TENANTS_READ` → `{ items: BranchResponse[] }`, oldest
@@ -457,6 +489,12 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
        "Starts {startDate}", and a "Cancel change" button that asks for a reason.
    - **Branches tab**: `GET /platform/tenants/:id/branches` table (name, district, phone, status
      badge, created date). Read-only: schools manage their own branches.
+   - **Users tab**: `GET /platform/tenants/:id/users`. Header "Seats: {seatsUsed} / {seatLimit ??
+     'Unlimited'}", turning a warning colour when `seatsUsed > seatLimit`.
+     - Table columns: name, email, role, status badge, branch access ("All branches" or branch
+       names, with closed ones struck through), last login.
+     - Show a "No open branch" badge when `hasActiveBranch` is false.
+     - Read-only: no actions for staff rows. The owner row links to the owner card.
    - **Subscription history tab**: `GET /subscriptions` table with status badges, start/end dates,
      amounts and cancellation reasons.
    - **Owner card**: name, email, phone, NIC, status badge, "Must change password" badge, last login.
@@ -492,8 +530,8 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
 ## 6. Not available yet (don't build UI for these)
 
 - Changing **tenant access** (suspend/restore), invoices and payments: they come with SaaS billing.
-- **Usage** against plan limits (staff/branches/instructors/vehicles counts). The branches tab shows
-  the branch list but there is no usage summary endpoint yet.
+- **Usage** against plan limits for branches, instructors and vehicles. Staff seats are covered by the
+  users tab; the branches tab shows the branch list, but there is no usage summary endpoint yet.
 - Creating or editing **branches** from the admin dashboard: schools do this themselves.
 - **Tenant-specific limit overrides.**
 - **Owner transfer** or a second owner.

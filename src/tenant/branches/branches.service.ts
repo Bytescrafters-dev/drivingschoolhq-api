@@ -7,6 +7,7 @@ import {
   BranchStatus,
   type District,
   PlanLimitCode,
+  TenantSessionRevokedReason,
   TenantUserBranchAccess,
 } from '../../generated/prisma/enums.js';
 import { TenantEntitlementsService } from '../../platform/entitlements/tenant-entitlements.service.js';
@@ -21,6 +22,7 @@ import {
   TENANT_CONTEXT_REPOSITORY,
   type TenantContextRepository,
 } from '../context/interfaces/tenant-context.repository.js';
+import { TenantSessionsService } from '../sessions/tenant-sessions.service.js';
 import { BranchAccessService, viewerOf } from './branch-access.service.js';
 import {
   BRANCH_REPOSITORY,
@@ -28,11 +30,22 @@ import {
   type BranchDetails,
   type BranchDetailsChange,
   type BranchRepository,
+  type ExclusiveBranchUser,
 } from './interfaces/branch.repository.js';
 
 export interface BranchListItem {
   branch: Branch;
   isDefault: boolean;
+}
+
+export interface ClosedBranch {
+  branch: Branch;
+  /**
+   * Active SELECTED staff whose only ACTIVE branch this was. They are signed
+   * out and cannot sign in until a branch of theirs is reopened or they are
+   * given another one.
+   */
+  lockedOutStaff: ExclusiveBranchUser[];
 }
 
 /**
@@ -42,8 +55,9 @@ export interface BranchListItem {
  *   reopened (a downgrade never closes existing branches);
  * - users only see and manage branches they can access; a SELECTED creator is
  *   assigned to the branch they create;
- * - a branch cannot close while it is some active staff member's only branch;
- *   defaults pointing at a closed branch move to another accessible branch.
+ * - closing a branch signs out staff for whom it was the only ACTIVE branch
+ *   (they cannot sign in until it reopens); defaults pointing at a closed
+ *   branch move to another accessible branch.
  * Create/close/reopen lock the tenant row (lock order: tenant → branch → users);
  * every change is audited in the same transaction.
  */
@@ -58,6 +72,7 @@ export class BranchesService {
     private readonly audit: TenantAuditService,
     private readonly tx: TransactionManager,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly sessions: TenantSessionsService,
   ) {}
 
   async list(
@@ -157,7 +172,7 @@ export class BranchesService {
     actor: AuthenticatedTenantUser,
     branchId: string,
     meta: RequestMeta,
-  ): Promise<Branch> {
+  ): Promise<ClosedBranch> {
     return this.tx.run(async () => {
       await this.lockTenant(actor.tenantId);
       const current = await this.lockAccessible(actor, branchId);
@@ -175,19 +190,11 @@ export class BranchesService {
           'A school must keep at least one active branch',
         );
       }
-      const exclusive = await this.branches.findExclusiveUsers(
+      // Who loses their last ACTIVE branch (computed before the status flips).
+      const lockedOutStaff = await this.branches.findExclusiveUsers(
         actor.tenantId,
         branchId,
       );
-      if (exclusive.length > 0) {
-        throw new AppError(
-          'CONFLICT',
-          'BRANCH_HAS_EXCLUSIVE_STAFF',
-          `These staff members can only work in this branch; give them another branch first: ${exclusive
-            .map((user) => `${user.fullName} <${user.email}>`)
-            .join(', ')}`,
-        );
-      }
       const closed = await this.branches.setStatus(
         actor.tenantId,
         branchId,
@@ -198,10 +205,18 @@ export class BranchesService {
         actor.tenantId,
         branchId,
       );
+      for (const user of lockedOutStaff) {
+        await this.sessions.revokeAllForUser(
+          actor.tenantId,
+          user.id,
+          TenantSessionRevokedReason.NO_ACTIVE_BRANCH,
+        );
+      }
       await this.audited(actor, closed, TenantAuditAction.BRANCH_CLOSED, meta, {
         reassignedDefaults,
+        lockedOutUserIds: lockedOutStaff.map((user) => user.id),
       });
-      return closed;
+      return { branch: closed, lockedOutStaff };
     });
   }
 

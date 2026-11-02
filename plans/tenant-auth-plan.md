@@ -51,16 +51,20 @@ NestJS API  /tenant/auth/*, /tenant/...
 
 | Endpoint | Auth | Request | Success | Errors (`code`) |
 |---|---|---|---|---|
-| `POST /tenant/auth/login` | none, throttled | `{ dsCode, email, password }` | `200 TenantAuthTokens` | `400 BAD_REQUEST` (validation); `401 INVALID_CREDENTIALS`; `403 TENANT_CLOSED`; `429 TOO_MANY_REQUESTS` |
-| `POST /tenant/auth/refresh` | none, throttled | `{ refreshToken }` | `200 TenantAuthTokens` (**new** refresh token) | `401 INVALID_REFRESH_TOKEN`; `429 TOO_MANY_REQUESTS` |
+| `POST /tenant/auth/login` | none, throttled | `{ dsCode, email, password }` | `200 TenantAuthTokens` | `400 BAD_REQUEST` (validation); `401 INVALID_CREDENTIALS`; `403 TENANT_CLOSED`; `403 NO_ACTIVE_BRANCH`; `429 TOO_MANY_REQUESTS` |
+| `POST /tenant/auth/refresh` | none, throttled | `{ refreshToken }` | `200 TenantAuthTokens` (**new** refresh token) | `401 INVALID_REFRESH_TOKEN`; `403 NO_ACTIVE_BRANCH`; `429 TOO_MANY_REQUESTS` |
 | `POST /tenant/auth/logout` | Bearer | — | `204` | `401` (already invalid; treat as success) |
 | `POST /tenant/auth/change-password` | Bearer | `{ currentPassword, newPassword }` | `204` | `400 CURRENT_PASSWORD_INCORRECT`; `400 PASSWORD_REUSED`; `400 BAD_REQUEST` (length) |
 | `GET /tenant/auth/me` | Bearer | — | `200 TenantMe` | `401` |
+| `PATCH /tenant/me` | Bearer | `{ fullName?, phone? }` (`phone: null` clears it; not for the owner) | `200 { id, email, fullName, phone, nic, role }` | `400 BAD_REQUEST`, `400 PHONE_REQUIRED` (owner) |
 
 Login error details:
 - `INVALID_CREDENTIALS` covers an unknown school, unknown email, wrong password or a disabled user.
   All four get the same response.
 - `TENANT_CLOSED` is only returned after the password has been verified.
+- `NO_ACTIVE_BRANCH` (also after the password check): a staff member with SELECTED branch access
+  none of whose branches is open (e.g. their only branch was closed). They can sign in again once a
+  branch of theirs reopens or they are given another one.
 
 ```ts
 // Server-side only. Never forwarded to the browser.
@@ -75,12 +79,12 @@ type TenantAuthTokens = {
 
 type TenantMe = {
   user: {
-    id: string; email: string; fullName: string;
+    id: string; email: string; fullName: string; phone: string | null;
     role: 'OWNER' | 'ADMIN' | 'BRANCH_MANAGER' | 'FRONT_DESK' | 'INSTRUCTOR' | 'ACCOUNTANT';
     mustChangePassword: boolean;
     branchAccess: 'ALL' | 'SELECTED';
     defaultBranchId: string | null;
-    permissions: TenantPermission[];  // added in Part A1
+    permissions: TenantPermission[];  // 'BRANCHES_MANAGE' | 'STAFF_MANAGE' so far
   };
   tenant: { id: string; dsCode: string; displayName: string;
             accessStatus: 'ACTIVE' | 'GRACE_PERIOD' | 'SUSPENDED' | null };
@@ -295,7 +299,7 @@ Branch-scoped calls add `X-Branch-Id` from the current-branch store (see `tenant
 | `/login` | signed-out | See below. |
 | `/forceChangePassword` | signed-in, temp password | See below. |
 | `/` (dashboard group) | signed-in | See below. |
-| `/my-profile` | signed-in | Name, email, role, school; "Change password" (current, new, confirm). On success, show a toast saying other devices were signed out. |
+| `/my-profile` | signed-in | Read-only email, role, school. **Edit name and phone** via `PATCH /tenant/me` (owners can't clear their phone). "Change password" (current, new, confirm) via `/api/auth/change-password`; on success, show a toast saying other devices were signed out. Email and NIC are changed by a manager (or the platform, for the owner). |
 
 **`/login` (signed-out):**
 - **Fields:** DS code, email, password.
@@ -327,6 +331,7 @@ Branch-scoped calls add `X-Branch-Id` from the current-branch store (see `tenant
 |---|---|
 | `INVALID_CREDENTIALS` | "Incorrect DS code, email or password." |
 | `TENANT_CLOSED` | "This driving school's account has been closed. Contact DrivingSchoolHQ support." |
+| `NO_ACTIVE_BRANCH` | "None of your branches is open right now. Ask your school owner or admin." (on refresh too: clear the session and show this on the login page) |
 | `TOO_MANY_REQUESTS` | "Too many attempts. Wait a minute and try again." |
 | `CURRENT_PASSWORD_INCORRECT` | "Your current password is incorrect." |
 | `PASSWORD_REUSED` | "Choose a password different from your current one." |

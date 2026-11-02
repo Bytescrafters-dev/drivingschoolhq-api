@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import {
   TenantRole,
   TenantStatus,
+  TenantUserBranchAccess,
   TenantUserStatus,
 } from '../../../generated/prisma/enums.js';
 import { META, expectAppError } from '../../../../test/support/fakes.js';
@@ -33,9 +34,12 @@ function context(
 async function setup(mustChangePassword = false) {
   const ctx = tenantAuthSetup();
   const tenant = ctx.tenants.seed({ dsCode: 'DS1' });
+  const main = ctx.branches.seed({ tenantId: tenant.id, name: 'Main Branch' });
   const user = ctx.users.seedUser({
     tenantId: tenant.id,
     role: TenantRole.OWNER,
+    branchAccess: TenantUserBranchAccess.ALL,
+    defaultBranchId: main.id,
     email: 'owner@school.lk',
     mustChangePassword,
     passwordHash: `hashed:${PASSWORD}`,

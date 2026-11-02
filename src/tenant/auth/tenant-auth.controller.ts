@@ -81,12 +81,14 @@ export class TenantAuthController {
   @TenantAuth()
   @TenantAllowPasswordChangeRequired()
   async me(@CurrentTenantUser() actor: AuthenticatedTenantUser) {
-    const { user, tenant, branches, permissions } = await this.auth.me(actor);
+    const { user, phone, tenant, branches, permissions } =
+      await this.auth.me(actor);
     return {
       user: {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        phone,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
         branchAccess: user.branchAccess,

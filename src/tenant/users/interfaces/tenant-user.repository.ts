@@ -52,6 +52,13 @@ export interface TenantOwnerProfileChange {
   nic?: string;
 }
 
+/** What any user may change about themselves (not the login email/NIC). */
+export interface OwnProfileChange {
+  fullName?: string;
+  /** null clears it (not allowed for the OWNER: DB CHECK). */
+  phone?: string | null;
+}
+
 /**
  * Every operation is scoped to a tenant. Owner operations additionally only
  * ever match the row with role OWNER.
@@ -73,6 +80,14 @@ export interface TenantUserRepository {
   setOwnerPassword(tenantId: string, passwordHash: string): Promise<TenantUser>;
   disableOwner(tenantId: string, at: Date): Promise<TenantUser>;
   enableOwner(tenantId: string): Promise<TenantUser>;
+
+  // --- any role, always tenant-scoped ---
+  findById(tenantId: string, id: string): Promise<TenantUser | null>;
+  updateOwnProfile(
+    tenantId: string,
+    id: string,
+    change: OwnProfileChange,
+  ): Promise<TenantUser>;
 
   // --- authentication (any role, always tenant-scoped) ---
   findCredentialsByEmail(

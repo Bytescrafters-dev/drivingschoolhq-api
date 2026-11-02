@@ -151,7 +151,7 @@ type BranchResponse = {
 | View | `GET /tenant/branches/:id` | `BranchResponse` | `404 BRANCH_NOT_FOUND` |
 | Create | `POST /tenant/branches` `{ name, address, district, phone }` | `201 BranchResponse` | `409 PLAN_LIMIT_REACHED`, `409 BRANCH_NAME_TAKEN`, `400` validation |
 | Edit | `PATCH /tenant/branches/:id`, any of `{ name, address, district, phone }` | `BranchResponse` | `409 BRANCH_CLOSED`, `409 BRANCH_NAME_TAKEN`, `404` |
-| Close | `POST /tenant/branches/:id/close` (no body) | `BranchResponse` (`CLOSED`) | `409 LAST_ACTIVE_BRANCH`, `409 BRANCH_HAS_EXCLUSIVE_STAFF`, `409 BRANCH_ALREADY_CLOSED`, `404` |
+| Close | `POST /tenant/branches/:id/close` (no body) | `BranchResponse` (`CLOSED`) + `lockedOutStaff: { id, fullName, email }[]` | `409 LAST_ACTIVE_BRANCH`, `409 BRANCH_ALREADY_CLOSED`, `404` |
 | Reopen | `POST /tenant/branches/:id/reopen` (no body) | `BranchResponse` (`ACTIVE`) | `409 PLAN_LIMIT_REACHED`, `409 BRANCH_NOT_CLOSED`, `404` |
 | Set my default | `PATCH /tenant/me/default-branch` `{ branchId }` | `BranchResponse` | `409 BRANCH_CLOSED`, `404 BRANCH_NOT_FOUND` |
 
@@ -173,8 +173,9 @@ type BranchResponse = {
 - **Closing** (confirm dialog):
   - The branch's data is kept, and it can be reopened later.
   - The last active branch can't be closed.
-  - A branch can't be closed while it is the **only** branch of some active staff member
-    (`BRANCH_HAS_EXCLUSIVE_STAFF`; the message lists them). Give them another branch first.
+  - Staff for whom it is the **only** open branch are signed out and can't sign in
+    (`403 NO_ACTIVE_BRANCH`) until it reopens or they get another branch. The response's
+    `lockedOutStaff` lists them.
   - Users whose default was this branch move to another branch they can access.
   - If the closed branch is the **current branch** in this tab, switch to the default (refetch `/me`).
 - **Closed branches are read-only** until reopened.
