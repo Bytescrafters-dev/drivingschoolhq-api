@@ -8,6 +8,12 @@ import {
 import { TenantEntitlementsService } from '../../platform/entitlements/tenant-entitlements.service.js';
 import { InMemoryBranchRepository } from '../../../test/support/branch-fakes.js';
 import {
+  InMemoryBranchProfileRepository,
+  InMemoryVehicleClassRepository,
+} from '../../../test/support/branch-profile-fakes.js';
+import { VehicleClassCatalogService } from '../../reference-data/vehicle-classes/vehicle-class-catalog.service.js';
+import { BranchProfileReader } from './profile/branch-profile-reader.service.js';
+import {
   FixedClock,
   META,
   expectAppError,
@@ -56,6 +62,11 @@ function setup(options: { maxBranches?: number | null } = {}) {
     passthroughTx,
     clock,
     sessions.asService(),
+    new BranchProfileReader(
+      new InMemoryBranchProfileRepository(),
+      new VehicleClassCatalogService(new InMemoryVehicleClassRepository()),
+      clock,
+    ),
   );
   const tenant = tenants.seed();
   const main = branches.seed({ tenantId: tenant.id, name: 'Main Branch' });

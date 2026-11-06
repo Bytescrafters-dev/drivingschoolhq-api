@@ -56,6 +56,8 @@ export interface ExclusiveBranchUser {
 export interface BranchRepository {
   /** Throws AppError BRANCH_NAME_TAKEN for a duplicate name (any case). */
   create(branch: NewBranch): Promise<Branch>;
+  /** Any branch of the tenant (any status), without an access check. */
+  findById(tenantId: string, branchId: string): Promise<Branch | null>;
   listForTenant(
     tenantId: string,
     options: { includeClosed: boolean },

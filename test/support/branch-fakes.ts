@@ -96,6 +96,12 @@ export class InMemoryBranchRepository implements BranchRepository {
       phone: input.phone,
     });
   }
+  async findById(tenantId: string, branchId: string) {
+    const branch = this.rows.find(
+      (b) => b.tenantId === tenantId && b.id === branchId,
+    );
+    return branch ? { ...branch } : null;
+  }
   async listForTenant(tenantId: string, options: { includeClosed: boolean }) {
     return this.rows
       .filter((b) => b.tenantId === tenantId)

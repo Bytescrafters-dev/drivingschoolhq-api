@@ -75,6 +75,13 @@ export class PrismaBranchRepository implements BranchRepository {
     }
   }
 
+  findById(tenantId: string, branchId: string): Promise<Branch | null> {
+    return this.tx.client.branch.findFirst({
+      where: { tenantId, id: branchId },
+      select: BRANCH_SELECT,
+    });
+  }
+
   listForTenant(
     tenantId: string,
     options: { includeClosed: boolean },

@@ -10,8 +10,8 @@
 2. **Settings → Branches**: listing, viewing, creating, editing, closing and reopening branches,
    depending on the user's role.
 
-This doc replaces `plans/tenant-branches-frontend.md` §3–§5 for the dashboard. The backend contract
-is the same.
+Related: staff management is in `plans/tenant-dashboard-staff.md`; the branch profile (licence,
+grade, vehicle classes) is in `plans/tenant-dashboard-branch-profile.md`.
 
 **All calls go through the BFF:** `fetch('/api/proxy/<backend path>')` via `apiFetch`. Never call the
 API directly, and never send a `tenantId`; the backend takes the school from the session.
@@ -192,7 +192,11 @@ type Branch = {
   createdAt: string;
   updatedAt: string;
 };
-type BranchListItem = Branch & { isDefault: boolean };  // isDefault = the user's own default
+type BranchListItem = Branch & {
+  isDefault: boolean;                // the user's own default
+  profile: BranchProfileSummary;     // grade, licence, classes, readiness: see tenant-dashboard-branch-profile.md
+};
+// GET /tenant/branches/:id also returns `profile`; create/edit/close/reopen responses don't.
 
 type TenantMe = {
   user: {

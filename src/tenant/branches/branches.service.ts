@@ -32,10 +32,20 @@ import {
   type BranchRepository,
   type ExclusiveBranchUser,
 } from './interfaces/branch.repository.js';
+import {
+  BranchProfileReader,
+  type BranchProfileSummary,
+} from './profile/branch-profile-reader.service.js';
 
 export interface BranchListItem {
   branch: Branch;
   isDefault: boolean;
+  profile: BranchProfileSummary;
+}
+
+export interface BranchDetailsView {
+  branch: Branch;
+  profile: BranchProfileSummary;
 }
 
 export interface ClosedBranch {
@@ -73,6 +83,7 @@ export class BranchesService {
     private readonly tx: TransactionManager,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly sessions: TenantSessionsService,
+    private readonly profiles: BranchProfileReader,
   ) {}
 
   async list(
@@ -83,10 +94,22 @@ export class BranchesService {
       this.branches.listAccessible(viewerOf(actor), { includeClosed }),
       this.access.myBranches(actor),
     ]);
+    const profiles = await this.profiles.summaries(actor.tenantId, branches);
     return branches.map((branch) => ({
       branch,
       isDefault: branch.id === mine.defaultBranchId,
+      profile: profiles.get(branch.id)!,
     }));
+  }
+
+  /** The branch with its profile summary (grade, licence, readiness). */
+  async details(
+    actor: AuthenticatedTenantUser,
+    branchId: string,
+  ): Promise<BranchDetailsView> {
+    const branch = await this.get(actor, branchId);
+    const profiles = await this.profiles.summaries(actor.tenantId, [branch]);
+    return { branch, profile: profiles.get(branch.id)! };
   }
 
   async get(actor: AuthenticatedTenantUser, branchId: string): Promise<Branch> {

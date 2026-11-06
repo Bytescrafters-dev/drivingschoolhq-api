@@ -13,7 +13,6 @@ import {
 } from '../../generated/prisma/enums.js';
 import { TransactionManager } from '../../prisma/transaction-manager.js';
 import { BranchProvisioningService } from '../../tenant/branches/branch-provisioning.service.js';
-import type { Branch } from '../../tenant/branches/interfaces/branch.repository.js';
 import { TenantSessionsService } from '../../tenant/sessions/tenant-sessions.service.js';
 import type { TenantUser } from '../../tenant/users/interfaces/tenant-user.repository.js';
 import { TenantOwnersService } from '../../tenant/users/tenant-owners.service.js';
@@ -198,12 +197,6 @@ export class TenantsService {
       return tenant.id;
     });
     return this.get(tenantId);
-  }
-
-  /** Read-only view of a tenant's branches (oldest first, any status). */
-  async listBranches(tenantId: string): Promise<Branch[]> {
-    if (!(await this.tenants.findById(tenantId))) throw tenantNotFound();
-    return this.branches.listForTenant(tenantId);
   }
 
   async updateProfile(

@@ -13,7 +13,7 @@
 - protecting routes;
 - UX-only permission checks.
 
-**Out of scope:** the branch switcher and branch screens are covered by `plans/tenant-branches-frontend.md`.
+**Out of scope:** the branch switcher and branch screens are covered by `plans/tenant-dashboard-branches.md`.
 This plan only gets the user signed in and loads `/me`, which that doc builds on.
 
 **Error shape.** Every backend error looks like `{ statusCode, code, message }`, and the frontend
@@ -157,8 +157,9 @@ All three are implemented in the API. The notes below describe what now exists.
 - **Admin dashboard:** it has the same issue (platform login/refresh). The same `TRUST_PROXY` setting fixes it.
 
 ### A3. Docs
-**Done:** `plans/tenant-branches-frontend.md` §7 now says the tenant app uses the BFF, so CORS is not
-required, and lists the headers the BFF must forward. Its `/me` type includes `permissions`.
+**Done:** the tenant app uses the BFF, so CORS is not required. The BFF must forward
+`X-Branch-Id`, the browser's `User-Agent` and the client IP as `X-Forwarded-For` (the API trusts it
+per `TRUST_PROXY`). The `/me` type includes `permissions`.
 
 ---
 
@@ -270,7 +271,7 @@ Keep `apiFetch` and `ApiError(message, status, code)`.
 | `403 PASSWORD_CHANGE_REQUIRED` | Go to `/forceChangePassword?next=<current path>` |
 | any other non-2xx | Throw `ApiError` with the backend `code` |
 
-Branch-scoped calls add `X-Branch-Id` from the current-branch store (see `tenant-branches-frontend.md`).
+Branch-scoped calls add `X-Branch-Id` from the current-branch store (see `tenant-dashboard-branches.md` §3).
 
 ### 4.8 Middleware (`middleware.ts`)
 - **Protected routes** (everything except `/login`, `/forceChangePassword` and `/api/*`) need the
@@ -354,7 +355,7 @@ Branch-scoped calls add `X-Branch-Id` from the current-branch store (see `tenant
 2. `me.user.mustChangePassword` → `/forceChangePassword`.
 3. `me.branches` is empty → blocking screen: "You are not assigned to any active branch. Contact your school admin."
 4. `me.tenant.accessStatus` is `GRACE_PERIOD` or `SUSPENDED` → a banner.
-5. Otherwise, initialise the current branch (`tenant-branches-frontend.md` §3) and render.
+5. Otherwise, initialise the current branch (`tenant-dashboard-branches.md` §3) and render.
 
 **Access token expiry (every 15 minutes):** the proxy sees `401`, refreshes, retries, and rewrites
 the cookies. The user notices nothing.
@@ -437,4 +438,4 @@ signed out.
    - the dashboard layout gate (`me`, the no-branch screen, the access banner);
    - the profile page;
    - `NavUser`.
-6. Run the §7 acceptance checks, then move on to the branch switcher (`tenant-branches-frontend.md`).
+6. Run the §7 acceptance checks, then move on to the branch switcher (`tenant-dashboard-branches.md`).

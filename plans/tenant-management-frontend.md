@@ -264,8 +264,9 @@ it is back under the limit.
 
 #### Tenant branches (read-only)
 
-`GET /platform/tenants/:id/branches` · `TENANTS_READ` → `{ items: BranchResponse[] }`, oldest
-first (the Main Branch comes first), all statuses. `404 TENANT_NOT_FOUND`.
+`GET /platform/tenants/:id/branches` · `TENANTS_READ` → `{ items: (BranchResponse & { profile:
+BranchProfileSummary })[] }`, oldest first (the Main Branch comes first), all statuses.
+`404 TENANT_NOT_FOUND`.
 
 ```ts
 type BranchResponse = {
@@ -273,6 +274,77 @@ type BranchResponse = {
   phone: string;                     // "+94812223333"
   status: 'ACTIVE' | 'CLOSED'; closedAt: string | null;
   createdAt: string; updatedAt: string;
+};
+```
+
+#### Branch profile: grade, licence and vehicle classes (read-only)
+
+Each branch has its own **driving-school licence**, which states its **grade** (A, B or C). The grade
+decides which DMT vehicle classes the branch may teach; the branch then chooses which of those it
+offers. The school enters all of this in the tenant app (OWNER/ADMIN). **Platform admins only view
+it.**
+
+| Grade | Permitted classes |
+|---|---|
+| A | all 13: A1, A, B1, B, C1, C, CE, D1, D, DE, G1, G, J |
+| B | 11: all except CE and DE |
+| C | 5: A1, A, B1, B, G |
+
+- **Branches start without a profile.** The Main Branch created at onboarding has no licence and no
+  classes, so expect "Not set" on new tenants. There is no grade or licence field in onboarding.
+- **The licence is data entry only:**
+  - No document.
+  - The licence number is not unique.
+  - **Expiry never blocks the school.** It only produces a warning. Licence validity is the
+    school's responsibility.
+- **Renewals keep history** (`licenceHistory`, newest first). A lower grade on renewal automatically
+  removes offered classes the new grade doesn't permit.
+
+`GET /platform/tenants/:id/branches/:branchId/profile` · `TENANTS_READ` → `BranchProfile`.
+- `404 TENANT_NOT_FOUND`: unknown tenant.
+- `404 BRANCH_NOT_FOUND`: unknown branch, or one belonging to another tenant.
+- Works for CLOSED branches too.
+
+```ts
+type DrivingSchoolGrade = 'A' | 'B' | 'C';
+
+type VehicleClass = {
+  code: string;                          // 'A1','A','B1','B','C1','C','CE','D1','D','DE','G1','G','J'
+  name: string; description: string;
+  permittedGrades: DrivingSchoolGrade[];
+};
+
+type BranchLicence = {
+  id: string; licenceNumber: string; grade: DrivingSchoolGrade;
+  issuedOn: string; expiresOn: string;   // 'YYYY-MM-DD' calendar dates (no TZ shift)
+  recordedByTenantUserId: string;        // a tenant user (school staff), not a platform admin
+  createdAt: string; updatedAt: string;  // ISO instants
+};
+
+type BranchReadiness = {
+  operational: boolean;                  // true ⇔ no blockers
+  blockers: ({ code: 'BRANCH_LICENCE_MISSING' } | { code: 'NO_VEHICLE_CLASSES_OFFERED' })[];
+  warnings: (
+    | { code: 'BRANCH_LICENCE_EXPIRED'; expiredOn: string }
+    | { code: 'BRANCH_LICENCE_EXPIRING'; expiresOn: string; daysLeft: number }   // ≤ 30 days
+  )[];
+};
+
+type BranchProfileSummary = {            // on every item of GET /platform/tenants/:id/branches
+  grade: DrivingSchoolGrade | null;      // null = no licence recorded yet
+  licenceNumber: string | null;
+  licenceExpiresOn: string | null;
+  offeredVehicleClasses: string[];       // codes, DMT order
+  readiness: BranchReadiness;
+};
+
+type BranchProfile = {
+  branchId: string;
+  currentLicence: BranchLicence | null;
+  licenceHistory: BranchLicence[];       // newest first, includes the current one
+  permittedVehicleClasses: VehicleClass[];  // for the current grade; [] without a licence
+  offeredVehicleClasses: VehicleClass[];
+  readiness: BranchReadiness;
 };
 ```
 
@@ -487,8 +559,25 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
        wizard, no trial), "Edit grace period".
      - When `scheduledSubscription` exists, show a "Scheduled change" panel: new plan, amount,
        "Starts {startDate}", and a "Cancel change" button that asks for a reason.
-   - **Branches tab**: `GET /platform/tenants/:id/branches` table (name, district, phone, status
-     badge, created date). Read-only: schools manage their own branches.
+   - **Branches tab**: `GET /platform/tenants/:id/branches` table. Read-only: schools manage their
+     own branches.
+     - **Columns:**
+       - name, district, phone, status badge, created date;
+       - **Grade** ("Grade A", or a muted "Not set");
+       - **Licence** (number, and "expires {licenceExpiresOn}");
+       - **Classes** (chips of `profile.offeredVehicleClasses`, collapsed when long).
+     - **Badges from `profile.readiness`:**
+       - blockers → amber "Profile incomplete";
+       - `BRANCH_LICENCE_EXPIRED` → red "Licence expired";
+       - `BRANCH_LICENCE_EXPIRING` → amber "Expires in N days".
+       - These are informational: nothing is blocked by expiry.
+     - **Row click** opens a read-only **Branch profile drawer** from
+       `GET /platform/tenants/:id/branches/:branchId/profile`:
+       - the licence card (number, grade, issued, expires);
+       - a 13-class grid: offered ✓, permitted but not offered (muted), not permitted (disabled,
+         with "Grade A only" etc. from `permittedGrades`);
+       - a licence history table (number, grade, issued, expires, recorded at);
+       - the readiness banners. No edit actions.
    - **Users tab**: `GET /platform/tenants/:id/users`. Header "Seats: {seatsUsed} / {seatLimit ??
      'Unlimited'}", turning a warning colour when `seatsUsed > seatLimit`.
      - Table columns: name, email, role, status badge, branch access ("All branches" or branch
@@ -519,7 +608,7 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
 | 401 | `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN`, `SESSION_INVALID` | refresh once, then go to login |
 | 403 | `PASSWORD_CHANGE_REQUIRED` | redirect to change-password |
 | 403 | `PLATFORM_PERMISSION_DENIED` | "You don't have permission" |
-| 404 | `TENANT_NOT_FOUND`, `TENANT_OWNER_NOT_FOUND`, `PLAN_PRICE_NOT_FOUND`, `NO_SCHEDULED_CHANGE` | not-found state or toast, then refetch |
+| 404 | `TENANT_NOT_FOUND`, `TENANT_OWNER_NOT_FOUND`, `PLAN_PRICE_NOT_FOUND`, `NO_SCHEDULED_CHANGE`, `BRANCH_NOT_FOUND` | not-found state or toast, then refetch |
 | 409 | `TENANT_DS_CODE_TAKEN` | field error on DS code |
 | 409 | `TENANT_USER_EMAIL_TAKEN`, `TENANT_USER_NIC_TAKEN` | field error on owner email / NIC |
 | 409 | `PLAN_NOT_SUBSCRIBABLE` | "This plan/price is no longer available"; reload the picker |
@@ -532,7 +621,11 @@ Render it as a timeline: an action label, "by {admin}" (or "System"), the time, 
 - Changing **tenant access** (suspend/restore), invoices and payments: they come with SaaS billing.
 - **Usage** against plan limits for branches, instructors and vehicles. Staff seats are covered by the
   users tab; the branches tab shows the branch list, but there is no usage summary endpoint yet.
-- Creating or editing **branches** from the admin dashboard: schools do this themselves.
+- Creating or editing **branches**, branch licences or offered vehicle classes from the admin
+  dashboard: schools do this themselves. The platform view is read-only.
+- Branch-profile changes in the **Activity tab**: they are recorded in the school's own (tenant)
+  audit log (`BRANCH_LICENCE_RECORDED`, `BRANCH_LICENCE_CORRECTED`, `BRANCH_VEHICLE_CLASSES_CHANGED`),
+  not in the platform audit log.
 - **Tenant-specific limit overrides.**
 - **Owner transfer** or a second owner.
 - Managing tenant **staff users**: that is done by the school itself in the tenant app.

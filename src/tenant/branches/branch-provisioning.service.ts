@@ -42,4 +42,8 @@ export class BranchProvisioningService {
   listForTenant(tenantId: string): Promise<Branch[]> {
     return this.branches.listForTenant(tenantId, { includeClosed: true });
   }
+
+  findForTenant(tenantId: string, branchId: string): Promise<Branch | null> {
+    return this.branches.findById(tenantId, branchId);
+  }
 }

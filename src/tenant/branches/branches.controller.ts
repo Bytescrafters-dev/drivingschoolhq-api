@@ -31,6 +31,7 @@ import {
   toBranchResponse,
 } from './interfaces/branch.response.js';
 import type { WorkingBranch } from './interfaces/working-branch.js';
+import { toBranchProfileSummaryResponse } from './profile/interfaces/branch-profile.response.js';
 
 @Controller('tenant/branches')
 @TenantAuth()
@@ -45,9 +46,10 @@ export class BranchesController {
   ) {
     const items = await this.branches.list(actor, query.includeClosed);
     return {
-      items: items.map(({ branch, isDefault }) => ({
+      items: items.map(({ branch, isDefault, profile }) => ({
         ...toBranchResponse(branch),
         isDefault,
+        profile: toBranchProfileSummaryResponse(profile),
       })),
     };
   }
@@ -56,8 +58,12 @@ export class BranchesController {
   async get(
     @CurrentTenantUser() actor: AuthenticatedTenantUser,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<BranchResponse> {
-    return toBranchResponse(await this.branches.get(actor, id));
+  ) {
+    const { branch, profile } = await this.branches.details(actor, id);
+    return {
+      ...toBranchResponse(branch),
+      profile: toBranchProfileSummaryResponse(profile),
+    };
   }
 
   @Post()

@@ -31,7 +31,13 @@ import {
   toTenantListItemResponse,
 } from './interfaces/tenant.response.js';
 import { toBranchResponse } from '../../tenant/branches/interfaces/branch.response.js';
+import {
+  type BranchProfileResponse,
+  toBranchProfileResponse,
+  toBranchProfileSummaryResponse,
+} from '../../tenant/branches/profile/interfaces/branch-profile.response.js';
 import { toStaffResponse } from '../../tenant/staff/interfaces/staff.response.js';
+import { TenantBranchesAdminService } from './tenant-branches-admin.service.js';
 import { TenantUsersAdminService } from './tenant-users-admin.service.js';
 import { TenantsService } from './tenants.service.js';
 
@@ -41,6 +47,7 @@ export class TenantsController {
   constructor(
     private readonly tenants: TenantsService,
     private readonly tenantUsers: TenantUsersAdminService,
+    private readonly tenantBranches: TenantBranchesAdminService,
   ) {}
 
   @Get()
@@ -67,8 +74,25 @@ export class TenantsController {
   @Get(':id/branches')
   @RequirePlatformPermissions(PlatformPermission.TENANTS_READ)
   async branches(@Param('id', ParseUUIDPipe) id: string) {
-    const branches = await this.tenants.listBranches(id);
-    return { items: branches.map(toBranchResponse) };
+    const items = await this.tenantBranches.list(id);
+    return {
+      items: items.map(({ branch, profile }) => ({
+        ...toBranchResponse(branch),
+        profile: toBranchProfileSummaryResponse(profile),
+      })),
+    };
+  }
+
+  /** A branch's licence history, permitted/offered classes and readiness. */
+  @Get(':id/branches/:branchId/profile')
+  @RequirePlatformPermissions(PlatformPermission.TENANTS_READ)
+  async branchProfile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('branchId', ParseUUIDPipe) branchId: string,
+  ): Promise<BranchProfileResponse> {
+    return toBranchProfileResponse(
+      await this.tenantBranches.profile(id, branchId),
+    );
   }
 
   /** All users of the school (owner first) and seat usage. Read-only. */

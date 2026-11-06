@@ -11,6 +11,7 @@ import {
   MyDefaultBranchController,
 } from './branches.controller.js';
 import { BranchesService } from './branches.service.js';
+import { BranchProfileCoreModule } from './profile/branch-profile-core.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { BranchesService } from './branches.service.js';
     TenantAuditModule,
     EntitlementsModule,
     TenantSessionsModule,
+    BranchProfileCoreModule,
   ],
   controllers: [
     BranchesController,

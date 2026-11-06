@@ -74,11 +74,13 @@ src/
 │   ├── instructors/
 │   └── vehicles/
 │
+├── reference-data/
+│   └── vehicle-classes/      # DMT classes + grade matrix (global, not tenant-owned)
+│
 ├── customers/
 │
 ├── licence-applications/
 │   ├── applications/
-│   ├── vehicle-classes/
 │   ├── documents/
 │   ├── medical/
 │   ├── written-tests/

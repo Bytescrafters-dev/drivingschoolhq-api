@@ -475,10 +475,11 @@ model TenantUser {
   createdByTenantUser      TenantUser?        @relation("TenantUserCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
   createdTenantUsers       TenantUser[]       @relation("TenantUserCreatedBy")
 
-  sessions          TenantUserSession[]
-  auditLogEntries   TenantAuditLog[]
-  branchAssignments TenantUserBranch[]
-  createdBranches   Branch[]            @relation("BranchCreatedBy")
+  sessions               TenantUserSession[]
+  auditLogEntries        TenantAuditLog[]
+  branchAssignments      TenantUserBranch[]
+  createdBranches        Branch[]              @relation("BranchCreatedBy")
+  recordedBranchLicences BranchSchoolLicence[] @relation("BranchLicenceRecordedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -495,6 +496,48 @@ model TenantUser {
 enum TenantUserBranchAccess {
   ALL
   SELECTED
+}
+
+// =============================================================================
+// REFERENCE DATA — vehicle classes and driving-school grades (global, seeded
+// by migration, read-only through the API)
+// =============================================================================
+
+/// Grade of a driving-school licence; decides which vehicle classes a branch
+/// may teach (see DrivingSchoolGradeVehicleClass).
+enum DrivingSchoolGrade {
+  A
+  B
+  C
+}
+
+/// A DMT licence vehicle class (A1, A, B1, B, C1, C, CE, D1, D, DE, G1, G, J).
+model VehicleClass {
+  id          String @id @default(uuid()) @db.Uuid
+  code        String @unique
+  name        String
+  description String
+  sortOrder   Int    @unique
+
+  permittedForGrades DrivingSchoolGradeVehicleClass[]
+  branchOfferings    BranchVehicleClass[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("vehicle_classes")
+}
+
+/// Which vehicle classes each driving-school grade may teach. Data, not code:
+/// a regulation change is a migration.
+model DrivingSchoolGradeVehicleClass {
+  grade          DrivingSchoolGrade
+  vehicleClassId String             @db.Uuid
+  vehicleClass   VehicleClass       @relation(fields: [vehicleClassId], references: [id], onDelete: Restrict)
+
+  @@id([grade, vehicleClassId])
+  @@index([vehicleClassId])
+  @@map("driving_school_grade_vehicle_classes")
 }
 
 // =============================================================================
@@ -529,9 +572,17 @@ model Branch {
   createdByTenantUserId    String?            @db.Uuid
   createdByTenantUser      TenantUser?        @relation("BranchCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
 
+  /// The branch's current driving-school licence (null until the profile is
+  /// completed). The composite FK guarantees it is one of this branch's own
+  /// licences. Older licences remain as history.
+  currentLicenceId String?              @unique @db.Uuid
+  currentLicence   BranchSchoolLicence? @relation("BranchCurrentLicence", fields: [tenantId, id, currentLicenceId], references: [tenantId, branchId, id], onDelete: Restrict)
+
   assignments     TenantUserBranch[]
-  defaultForUsers TenantUser[]       @relation("TenantUserDefaultBranch")
+  defaultForUsers TenantUser[]          @relation("TenantUserDefaultBranch")
   auditLogs       TenantAuditLog[]
+  licences        BranchSchoolLicence[] @relation("BranchLicences")
+  offeredClasses  BranchVehicleClass[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -539,6 +590,53 @@ model Branch {
   @@unique([tenantId, id])
   @@index([tenantId, status])
   @@map("branches")
+}
+
+/// The driving-school licence of a branch, stating its grade. Data entry
+/// only: validity is the school's responsibility (nothing is blocked by
+/// expiry). A renewal adds a new row; corrections edit the current row.
+model BranchSchoolLicence {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @db.Uuid
+  branchId      String             @db.Uuid
+  branch        Branch             @relation("BranchLicences", fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  /// Not unique: kept as entered by the school.
+  licenceNumber String
+  grade         DrivingSchoolGrade
+  issuedOn      DateTime           @db.Date
+  expiresOn     DateTime           @db.Date
+
+  recordedByTenantUserId String     @db.Uuid
+  recordedBy             TenantUser @relation("BranchLicenceRecordedBy", fields: [tenantId, recordedByTenantUserId], references: [tenantId, id], onDelete: Restrict)
+
+  currentForBranches Branch[] @relation("BranchCurrentLicence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, branchId, id])
+  @@index([tenantId, branchId, createdAt])
+  @@index([tenantId, recordedByTenantUserId])
+  @@map("branch_school_licences")
+}
+
+/// Vehicle classes a branch currently offers: always a subset of those its
+/// current licence grade permits (enforced by the application under the
+/// branch lock). Operational records reference VehicleClass, never this
+/// table, so removing an offering never affects ongoing work.
+model BranchVehicleClass {
+  tenantId       String       @db.Uuid
+  branchId       String       @db.Uuid
+  branch         Branch       @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  vehicleClassId String       @db.Uuid
+  vehicleClass   VehicleClass @relation(fields: [vehicleClassId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@id([branchId, vehicleClassId])
+  @@index([tenantId, branchId])
+  @@index([vehicleClassId])
+  @@map("branch_vehicle_classes")
 }
 
 /// Branches a SELECTED-access tenant user may work in. Composite FKs make an

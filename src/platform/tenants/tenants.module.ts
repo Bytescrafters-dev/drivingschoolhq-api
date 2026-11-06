@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BranchesCoreModule } from '../../tenant/branches/branches-core.module.js';
+import { BranchProfileCoreModule } from '../../tenant/branches/profile/branch-profile-core.module.js';
 import { TenantSessionsModule } from '../../tenant/sessions/tenant-sessions.module.js';
 import { StaffCoreModule } from '../../tenant/staff/staff-core.module.js';
 import { TenantUsersModule } from '../../tenant/users/tenant-users.module.js';
@@ -10,6 +11,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
 import { PrismaTenantRepository } from './infra/prisma-tenant.repository.js';
 import { TENANT_REPOSITORY } from './interfaces/tenant.repository.js';
 import { SubscriptionRenewalJob } from './subscription-renewal.job.js';
+import { TenantBranchesAdminService } from './tenant-branches-admin.service.js';
 import { TenantOwnerAdminService } from './tenant-owner-admin.service.js';
 import { TenantUsersAdminService } from './tenant-users-admin.service.js';
 import { TenantOwnerController } from './tenant-owner.controller.js';
@@ -26,6 +28,7 @@ import { TenantsService } from './tenants.service.js';
     TenantUsersModule,
     TenantSessionsModule,
     BranchesCoreModule,
+    BranchProfileCoreModule,
     StaffCoreModule,
     EntitlementsModule,
   ],
@@ -38,6 +41,7 @@ import { TenantsService } from './tenants.service.js';
     TenantsService,
     TenantSubscriptionsService,
     TenantOwnerAdminService,
+    TenantBranchesAdminService,
     TenantUsersAdminService,
     SubscriptionRenewalJob,
     { provide: TENANT_REPOSITORY, useClass: PrismaTenantRepository },
