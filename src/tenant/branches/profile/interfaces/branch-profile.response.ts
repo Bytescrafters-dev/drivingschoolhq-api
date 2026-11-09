@@ -1,6 +1,9 @@
 import { toIsoDate } from '../../../../common/time/calendar-date.js';
 import type { DrivingSchoolGrade } from '../../../../generated/prisma/enums.js';
-import type { VehicleClass } from '../../../../reference-data/vehicle-classes/interfaces/vehicle-class.repository.js';
+import {
+  toVehicleClassResponse,
+  type VehicleClassResponse,
+} from '../../../../reference-data/vehicle-classes/vehicle-class.response.js';
 import type { BranchReadiness } from '../branch-readiness.js';
 import type {
   BranchProfile,
@@ -8,12 +11,7 @@ import type {
 } from '../branch-profile-reader.service.js';
 import type { BranchSchoolLicence } from './branch-profile.repository.js';
 
-export interface VehicleClassResponse {
-  code: string;
-  name: string;
-  description: string;
-  permittedGrades: DrivingSchoolGrade[];
-}
+export { toVehicleClassResponse, type VehicleClassResponse };
 
 export interface BranchLicenceResponse {
   id: string;
@@ -42,15 +40,6 @@ export interface BranchProfileResponse {
   permittedVehicleClasses: VehicleClassResponse[];
   offeredVehicleClasses: VehicleClassResponse[];
   readiness: BranchReadiness;
-}
-
-export function toVehicleClassResponse(c: VehicleClass): VehicleClassResponse {
-  return {
-    code: c.code,
-    name: c.name,
-    description: c.description,
-    permittedGrades: c.permittedGrades,
-  };
 }
 
 export function toBranchLicenceResponse(

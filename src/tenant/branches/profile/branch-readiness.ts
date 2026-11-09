@@ -1,9 +1,4 @@
-import { toIsoDate } from '../../../common/time/calendar-date.js';
-
-/** How far ahead an approaching licence expiry is flagged. */
-export const LICENCE_EXPIRY_WARNING_DAYS = 30;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { licenceExpiry } from '../../../reference-data/vehicle-classes/licence-validity.js';
 
 /** Things that stop the branch from taking class-dependent work. */
 export type ReadinessBlocker =
@@ -38,19 +33,17 @@ export function evaluateBranchReadiness(
   if (!input.licence) {
     blockers.push({ code: 'BRANCH_LICENCE_MISSING' });
   } else {
-    const daysLeft = Math.round(
-      (input.licence.expiresOn.getTime() - today.getTime()) / DAY_MS,
-    );
-    if (daysLeft < 0) {
+    const expiry = licenceExpiry(input.licence.expiresOn, today);
+    if (expiry?.state === 'EXPIRED') {
       warnings.push({
         code: 'BRANCH_LICENCE_EXPIRED',
-        expiredOn: toIsoDate(input.licence.expiresOn),
+        expiredOn: expiry.expiredOn,
       });
-    } else if (daysLeft <= LICENCE_EXPIRY_WARNING_DAYS) {
+    } else if (expiry?.state === 'EXPIRING') {
       warnings.push({
         code: 'BRANCH_LICENCE_EXPIRING',
-        expiresOn: toIsoDate(input.licence.expiresOn),
-        daysLeft,
+        expiresOn: expiry.expiresOn,
+        daysLeft: expiry.daysLeft,
       });
     }
   }

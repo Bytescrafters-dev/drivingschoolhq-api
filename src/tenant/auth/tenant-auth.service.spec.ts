@@ -440,10 +440,15 @@ describe('TenantAuthService', () => {
 
       expect(
         (await service.me(actorOf(user, crypto.randomUUID()))).permissions,
-      ).toEqual(['BRANCHES_MANAGE', 'STAFF_MANAGE']);
+      ).toEqual([
+        'BRANCHES_MANAGE',
+        'STAFF_MANAGE',
+        'INSTRUCTORS_VIEW',
+        'INSTRUCTORS_MANAGE',
+      ]);
       expect(
         (await service.me(actorOf(clerk, crypto.randomUUID()))).permissions,
-      ).toEqual([]);
+      ).toEqual(['INSTRUCTORS_VIEW']);
     });
   });
 });

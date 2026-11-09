@@ -42,11 +42,9 @@ import {
   type StaffMember,
   type StaffProfileChange,
   type StaffRepository,
-  type StaffViewer,
 } from './interfaces/staff.repository.js';
+import { loadStaffActor, principalOf, type StaffActor } from './staff-actor.js';
 import {
-  type AccessScope,
-  type StaffPrincipal,
   assignableRoles,
   canAssignRole,
   manageDenial,
@@ -88,11 +86,7 @@ export interface StaffProfileInput {
   nic?: string | null;
 }
 
-/** The actor resolved for staff rules: who they are and what they hold. */
-interface ActorContext {
-  principal: StaffPrincipal;
-  viewer: StaffViewer;
-}
+type ActorContext = StaffActor;
 
 /**
  * Staff management inside a school (TenantUser with a non-owner role).
@@ -379,22 +373,8 @@ export class StaffService {
   // --- helpers ---
 
   /** The actor's own access, read fresh (assignments of any status). */
-  private async actorContext(
-    actor: AuthenticatedTenantUser,
-  ): Promise<ActorContext> {
-    const branchIds =
-      actor.branchAccess === TenantUserBranchAccess.ALL
-        ? []
-        : (
-            await this.branches.listAccessible(viewerOf(actor), {
-              includeClosed: true,
-            })
-          ).map((branch) => branch.id);
-    const scope: AccessScope = { branchAccess: actor.branchAccess, branchIds };
-    return {
-      principal: { id: actor.id, role: actor.role, scope },
-      viewer: { tenantId: actor.tenantId, ...scope },
-    };
+  private actorContext(actor: AuthenticatedTenantUser): Promise<ActorContext> {
+    return loadStaffActor(this.branches, actor);
   }
 
   private view(context: ActorContext, member: StaffMember): StaffView {
@@ -528,17 +508,6 @@ export function hasActiveBranch(member: StaffMember): boolean {
     member.branchAccess === TenantUserBranchAccess.ALL ||
     member.branches.some((branch) => branch.status === BranchStatus.ACTIVE)
   );
-}
-
-function principalOf(member: StaffMember): StaffPrincipal {
-  return {
-    id: member.id,
-    role: member.role,
-    scope: {
-      branchAccess: member.branchAccess,
-      branchIds: member.branches.map((branch) => branch.id),
-    },
-  };
 }
 
 function activeBranchIds(member: StaffMember): string[] {

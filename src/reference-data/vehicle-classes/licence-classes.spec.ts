@@ -1,11 +1,11 @@
-import { offeringsForLicence } from './branch-offerings.js';
+import { classesForLicence } from './licence-classes.js';
 
-describe('offeringsForLicence', () => {
+describe('classesForLicence', () => {
   it('pre-fills every permitted class on the first licence', () => {
     expect(
-      offeringsForLicence({
+      classesForLicence({
         isFirstLicence: true,
-        offeredIds: [],
+        currentIds: [],
         permittedIds: ['a1', 'a', 'b'],
       }),
     ).toEqual({ next: ['a1', 'a', 'b'], removed: [], prefilled: true });
@@ -13,9 +13,9 @@ describe('offeringsForLicence', () => {
 
   it('drops classes a lower grade does not permit', () => {
     expect(
-      offeringsForLicence({
+      classesForLicence({
         isFirstLicence: false,
-        offeredIds: ['a1', 'b', 'ce'],
+        currentIds: ['a1', 'b', 'ce'],
         permittedIds: ['a1', 'a', 'b'],
       }),
     ).toEqual({ next: ['a1', 'b'], removed: ['ce'], prefilled: false });
@@ -23,9 +23,9 @@ describe('offeringsForLicence', () => {
 
   it('adds nothing when a higher grade permits more', () => {
     expect(
-      offeringsForLicence({
+      classesForLicence({
         isFirstLicence: false,
-        offeredIds: ['b'],
+        currentIds: ['b'],
         permittedIds: ['a1', 'a', 'b', 'ce'],
       }),
     ).toEqual({ next: ['b'], removed: [], prefilled: false });

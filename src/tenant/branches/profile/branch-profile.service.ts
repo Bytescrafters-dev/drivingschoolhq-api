@@ -1,13 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import type { RequestMeta } from '../../../common/http/request-meta.js';
-import { parseIsoDate, toIsoDate } from '../../../common/time/calendar-date.js';
-import {
-  BranchStatus,
-  type DrivingSchoolGrade,
-} from '../../../generated/prisma/enums.js';
+import { BranchStatus } from '../../../generated/prisma/enums.js';
 import { TransactionManager } from '../../../prisma/transaction-manager.js';
 import type { VehicleClass } from '../../../reference-data/vehicle-classes/interfaces/vehicle-class.repository.js';
+import { classesForLicence } from '../../../reference-data/vehicle-classes/licence-classes.js';
+import {
+  assertLicenceDateOrder,
+  diffLicence,
+  type LicenceInput,
+  licenceMetadata,
+  parseLicence,
+  parseLicenceChange,
+} from '../../../reference-data/vehicle-classes/licence-details.js';
 import { VehicleClassCatalogService } from '../../../reference-data/vehicle-classes/vehicle-class-catalog.service.js';
 import {
   TenantAuditAction,
@@ -21,7 +26,6 @@ import {
   type Branch,
   type BranchRepository,
 } from '../interfaces/branch.repository.js';
-import { offeringsForLicence } from './branch-offerings.js';
 import {
   type BranchProfile,
   BranchProfileReader,
@@ -29,17 +33,7 @@ import {
 import {
   BRANCH_PROFILE_REPOSITORY,
   type BranchProfileRepository,
-  type BranchSchoolLicence,
-  type LicenceDetails,
 } from './interfaces/branch-profile.repository.js';
-
-/** Licence fields as received (calendar dates as YYYY-MM-DD). */
-export interface LicenceInput {
-  licenceNumber: string;
-  grade: DrivingSchoolGrade;
-  issuedOn: string;
-  expiresOn: string;
-}
 
 export interface LicenceChangeResult {
   profile: BranchProfile;
@@ -91,15 +85,14 @@ export class BranchProfileService {
     meta: RequestMeta,
   ): Promise<LicenceChangeResult> {
     const details = parseLicence(input);
-    assertDateOrder(details);
     return this.tx.run(async () => {
       const branch = await this.lockEditable(actor, branchId);
       const state = await this.state(branch);
       const previous = state.currentLicence;
       const permitted = await this.catalog.permittedFor(details.grade);
-      const change = offeringsForLicence({
+      const change = classesForLicence({
         isFirstLicence: previous === null,
-        offeredIds: state.offeredVehicleClassIds,
+        currentIds: state.offeredVehicleClassIds,
         permittedIds: permitted.map((c) => c.id),
       });
       const licence = await this.profiles.recordLicence({
@@ -150,7 +143,7 @@ export class BranchProfileService {
       const state = await this.state(branch);
       const current = state.currentLicence;
       if (!current) throw licenceMissing();
-      assertDateOrder({ ...current, ...change });
+      assertLicenceDateOrder({ ...current, ...change });
       const changes = diffLicence(current, change);
       if (Object.keys(changes).length === 0) {
         return {
@@ -167,9 +160,9 @@ export class BranchProfileService {
       let removed: string[] = [];
       if (corrected.grade !== current.grade) {
         const permitted = await this.catalog.permittedFor(corrected.grade);
-        const offerings = offeringsForLicence({
+        const offerings = classesForLicence({
           isFirstLicence: false,
-          offeredIds: state.offeredVehicleClassIds,
+          currentIds: state.offeredVehicleClassIds,
           permittedIds: permitted.map((c) => c.id),
         });
         await this.profiles.replaceOfferedClasses(
@@ -292,90 +285,6 @@ export class BranchProfileService {
       meta,
     });
   }
-}
-
-function parseLicence(input: LicenceInput): LicenceDetails {
-  return {
-    licenceNumber: requireLicenceNumber(input.licenceNumber),
-    grade: input.grade,
-    issuedOn: parseDate(input.issuedOn, 'issuedOn'),
-    expiresOn: parseDate(input.expiresOn, 'expiresOn'),
-  };
-}
-
-function parseLicenceChange(
-  input: Partial<LicenceInput>,
-): Partial<LicenceDetails> {
-  const change: Partial<LicenceDetails> = {};
-  if (input.licenceNumber !== undefined) {
-    change.licenceNumber = requireLicenceNumber(input.licenceNumber);
-  }
-  if (input.grade !== undefined) change.grade = input.grade;
-  if (input.issuedOn !== undefined) {
-    change.issuedOn = parseDate(input.issuedOn, 'issuedOn');
-  }
-  if (input.expiresOn !== undefined) {
-    change.expiresOn = parseDate(input.expiresOn, 'expiresOn');
-  }
-  return change;
-}
-
-function requireLicenceNumber(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new AppError(
-      'BAD_REQUEST',
-      'BAD_REQUEST',
-      'licenceNumber is required',
-    );
-  }
-  return trimmed;
-}
-
-function parseDate(value: string, field: string): Date {
-  try {
-    return parseIsoDate(value);
-  } catch {
-    throw new AppError(
-      'BAD_REQUEST',
-      'INVALID_LICENCE_DATES',
-      `${field} must be a valid YYYY-MM-DD date`,
-    );
-  }
-}
-
-function assertDateOrder(dates: { issuedOn: Date; expiresOn: Date }): void {
-  if (dates.expiresOn.getTime() <= dates.issuedOn.getTime()) {
-    throw new AppError(
-      'BAD_REQUEST',
-      'INVALID_LICENCE_DATES',
-      'The licence must expire after it was issued',
-    );
-  }
-}
-
-function licenceMetadata(licence: LicenceDetails) {
-  return {
-    licenceNumber: licence.licenceNumber,
-    grade: licence.grade,
-    issuedOn: toIsoDate(licence.issuedOn),
-    expiresOn: toIsoDate(licence.expiresOn),
-  };
-}
-
-function diffLicence(
-  current: BranchSchoolLicence,
-  change: Partial<LicenceDetails>,
-): Record<string, { from: string; to: string }> {
-  const before = licenceMetadata(current);
-  const after = licenceMetadata({ ...current, ...change });
-  const changes: Record<string, { from: string; to: string }> = {};
-  for (const key of Object.keys(before) as (keyof typeof before)[]) {
-    if (before[key] !== after[key]) {
-      changes[key] = { from: before[key], to: after[key] };
-    }
-  }
-  return changes;
 }
 
 function codesIn(classes: VehicleClass[]): string[] {

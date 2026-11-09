@@ -11,7 +11,8 @@
    depending on the user's role.
 
 Related: staff management is in `plans/tenant-dashboard-staff.md`; the branch profile (licence,
-grade, vehicle classes) is in `plans/tenant-dashboard-branch-profile.md`.
+grade, vehicle classes) is in `plans/tenant-dashboard-branch-profile.md`; instructors are in
+`plans/tenant-dashboard-instructors.md`.
 
 **All calls go through the BFF:** `fetch('/api/proxy/<backend path>')` via `apiFetch`. Never call the
 API directly, and never send a `tenantId`; the backend takes the school from the session.

@@ -84,7 +84,7 @@ type TenantMe = {
     mustChangePassword: boolean;
     branchAccess: 'ALL' | 'SELECTED';
     defaultBranchId: string | null;
-    permissions: TenantPermission[];  // 'BRANCHES_MANAGE' | 'STAFF_MANAGE' so far
+    permissions: TenantPermission[];  // 'BRANCHES_MANAGE' | 'STAFF_MANAGE' | 'INSTRUCTORS_VIEW' | 'INSTRUCTORS_MANAGE' so far
   };
   tenant: { id: string; dsCode: string; displayName: string;
             accessStatus: 'ACTIVE' | 'GRACE_PERIOD' | 'SUSPENDED' | null };

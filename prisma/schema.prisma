@@ -475,11 +475,14 @@ model TenantUser {
   createdByTenantUser      TenantUser?        @relation("TenantUserCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
   createdTenantUsers       TenantUser[]       @relation("TenantUserCreatedBy")
 
-  sessions               TenantUserSession[]
-  auditLogEntries        TenantAuditLog[]
-  branchAssignments      TenantUserBranch[]
-  createdBranches        Branch[]              @relation("BranchCreatedBy")
-  recordedBranchLicences BranchSchoolLicence[] @relation("BranchLicenceRecordedBy")
+  sessions                   TenantUserSession[]
+  auditLogEntries            TenantAuditLog[]
+  branchAssignments          TenantUserBranch[]
+  createdBranches            Branch[]              @relation("BranchCreatedBy")
+  recordedBranchLicences     BranchSchoolLicence[] @relation("BranchLicenceRecordedBy")
+  instructorProfile          InstructorProfile?    @relation("InstructorProfileUser")
+  createdInstructorProfiles  InstructorProfile[]   @relation("InstructorProfileCreatedBy")
+  recordedInstructorLicences InstructorLicence[]   @relation("InstructorLicenceRecordedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -519,8 +522,9 @@ model VehicleClass {
   description String
   sortOrder   Int    @unique
 
-  permittedForGrades DrivingSchoolGradeVehicleClass[]
-  branchOfferings    BranchVehicleClass[]
+  permittedForGrades       DrivingSchoolGradeVehicleClass[]
+  branchOfferings          BranchVehicleClass[]
+  instructorQualifications InstructorVehicleClass[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -637,6 +641,97 @@ model BranchVehicleClass {
   @@index([tenantId, branchId])
   @@index([vehicleClassId])
   @@map("branch_vehicle_classes")
+}
+
+// =============================================================================
+// DRIVING-SCHOOL DOMAIN — instructors
+// =============================================================================
+
+enum InstructorProfileStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// A staff member who teaches. Any role may hold one (the INSTRUCTOR role is
+/// only the login role of people with no other duties). Tenant-scoped: the
+/// person teaches in every branch their staff access covers. ACTIVE profiles
+/// count towards MAX_INSTRUCTORS; staff status never changes this row, so a
+/// disabled staff member keeps their seat until the profile is inactivated.
+/// Never deleted: training history will reference it.
+model InstructorProfile {
+  id            String                  @id @default(uuid()) @db.Uuid
+  tenantId      String                  @db.Uuid
+  tenantUserId  String                  @db.Uuid
+  tenantUser    TenantUser              @relation("InstructorProfileUser", fields: [tenantId, tenantUserId], references: [tenantId, id], onDelete: Restrict)
+  status        InstructorProfileStatus @default(ACTIVE)
+  inactivatedAt DateTime?
+
+  /// The current instructor licence. The composite FK guarantees it is one of
+  /// this profile's own licences; older licences remain as history. Set in
+  /// the same transaction that creates the profile.
+  currentLicenceId String?            @unique @db.Uuid
+  currentLicence   InstructorLicence? @relation("InstructorCurrentLicence", fields: [tenantId, id, currentLicenceId], references: [tenantId, instructorProfileId, id], onDelete: Restrict)
+
+  createdByTenantUserId String     @db.Uuid
+  createdBy             TenantUser @relation("InstructorProfileCreatedBy", fields: [tenantId, createdByTenantUserId], references: [tenantId, id], onDelete: Restrict)
+
+  licences         InstructorLicence[]      @relation("InstructorLicences")
+  qualifiedClasses InstructorVehicleClass[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, tenantUserId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdByTenantUserId])
+  @@map("instructor_profiles")
+}
+
+/// An instructor licence, stating its grade (same grade matrix as driving
+/// schools). Data entry only: expiry never blocks anything. A renewal adds a
+/// new row; corrections edit the current row.
+model InstructorLicence {
+  id                  String             @id @default(uuid()) @db.Uuid
+  tenantId            String             @db.Uuid
+  instructorProfileId String             @db.Uuid
+  instructorProfile   InstructorProfile  @relation("InstructorLicences", fields: [tenantId, instructorProfileId], references: [tenantId, id], onDelete: Restrict)
+  /// Not unique: kept as entered by the school.
+  licenceNumber       String
+  grade               DrivingSchoolGrade
+  issuedOn            DateTime           @db.Date
+  expiresOn           DateTime           @db.Date
+
+  recordedByTenantUserId String     @db.Uuid
+  recordedBy             TenantUser @relation("InstructorLicenceRecordedBy", fields: [tenantId, recordedByTenantUserId], references: [tenantId, id], onDelete: Restrict)
+
+  currentForProfiles InstructorProfile[] @relation("InstructorCurrentLicence")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, instructorProfileId, id])
+  @@index([tenantId, instructorProfileId, createdAt])
+  @@index([tenantId, recordedByTenantUserId])
+  @@map("instructor_licences")
+}
+
+/// Vehicle classes an instructor is qualified to teach: a subset of those
+/// their current licence grade permits, independent of any branch. What they
+/// teach at a branch is this set intersected with the branch's offerings.
+model InstructorVehicleClass {
+  tenantId            String            @db.Uuid
+  instructorProfileId String            @db.Uuid
+  instructorProfile   InstructorProfile @relation(fields: [tenantId, instructorProfileId], references: [tenantId, id], onDelete: Restrict)
+  vehicleClassId      String            @db.Uuid
+  vehicleClass        VehicleClass      @relation(fields: [vehicleClassId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@id([instructorProfileId, vehicleClassId])
+  @@index([tenantId, instructorProfileId])
+  @@index([vehicleClassId])
+  @@map("instructor_vehicle_classes")
 }
 
 /// Branches a SELECTED-access tenant user may work in. Composite FKs make an

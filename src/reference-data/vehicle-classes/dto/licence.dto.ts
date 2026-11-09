@@ -8,11 +8,12 @@ import {
   Length,
   Matches,
 } from 'class-validator';
-import { DrivingSchoolGrade } from '../../../../generated/prisma/enums.js';
-import { ISO_DATE_PATTERN } from '../../../../common/time/calendar-date.js';
-import { Trim } from '../../../../common/validation/validation-pipe.js';
+import { DrivingSchoolGrade } from '../../../generated/prisma/enums.js';
+import { ISO_DATE_PATTERN } from '../../../common/time/calendar-date.js';
+import { Trim } from '../../../common/validation/validation-pipe.js';
 
-export class RecordBranchLicenceDto {
+/** A graded licence (branch or instructor). */
+export class RecordLicenceDto {
   @Trim()
   @IsString()
   @Length(1, 100)
@@ -28,7 +29,8 @@ export class RecordBranchLicenceDto {
   expiresOn!: string;
 }
 
-export class CorrectBranchLicenceDto {
+/** Corrects the current licence; only the given fields change. */
+export class CorrectLicenceDto {
   @IsOptional()
   @Trim()
   @IsString()
@@ -48,8 +50,8 @@ export class CorrectBranchLicenceDto {
   expiresOn?: string;
 }
 
-export class SetBranchVehicleClassesDto {
-  /** Vehicle class codes, e.g. ["A1", "B"]; empty offers nothing. */
+export class SetVehicleClassesDto {
+  /** Vehicle class codes, e.g. ["A1", "B"]; empty clears the set. */
   @IsArray()
   @ArrayMaxSize(50)
   @Transform(({ value }: { value: unknown }) =>

@@ -35,8 +35,12 @@ TenantUser (a staff account; signs in to this dashboard)
 - **A seat** is one ACTIVE user, and **the owner counts**. The plan's staff limit caps seats.
   - Disabling someone frees a seat.
   - Enabling someone needs a free seat.
-- **"Instructor" here is only a login role.** The instructor records used for training and scheduling
-  (qualifications, vehicle classes) come in a later chunk and may link to such a user.
+- **"Instructor" here is only a login role**, for people who do nothing but teach. Teaching itself is an
+  **instructor profile** (licence, grade, qualified classes) that **any** staff member may hold; see
+  `plans/tenant-dashboard-instructors.md`.
+- **Disabling a staff member does not touch their instructor profile.** An active profile keeps its
+  `MAX_INSTRUCTORS` seat until it is inactivated on the Instructors page; mention this in the disable
+  confirmation when the person has one.
 
 ---
 
@@ -49,6 +53,7 @@ the Staff page.**
 |---|---|---|
 | `STAFF_MANAGE` | OWNER, ADMIN, BRANCH_MANAGER | everything under `/tenant/staff` |
 | `BRANCHES_MANAGE` | OWNER, ADMIN | branch management (other doc) |
+| `INSTRUCTORS_VIEW` / `INSTRUCTORS_MANAGE` | every role / OWNER, ADMIN, BRANCH_MANAGER | instructors (`plans/tenant-dashboard-instructors.md`) |
 
 Users without `STAFF_MANAGE` (FRONT_DESK, INSTRUCTOR, ACCOUNTANT) **don't see the Staff page at
 all**. The API returns `403 TENANT_PERMISSION_DENIED` for every `/tenant/staff` call.

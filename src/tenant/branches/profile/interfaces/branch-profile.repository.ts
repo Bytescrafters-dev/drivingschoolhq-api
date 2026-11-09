@@ -1,4 +1,5 @@
 import type { DrivingSchoolGrade } from '../../../../generated/prisma/enums.js';
+import type { LicenceDetails } from '../../../../reference-data/vehicle-classes/licence-details.js';
 
 export const BRANCH_PROFILE_REPOSITORY = Symbol('BRANCH_PROFILE_REPOSITORY');
 
@@ -16,12 +17,7 @@ export interface BranchSchoolLicence {
   updatedAt: Date;
 }
 
-export interface LicenceDetails {
-  licenceNumber: string;
-  grade: DrivingSchoolGrade;
-  issuedOn: Date;
-  expiresOn: Date;
-}
+export type { LicenceDetails };
 
 export type NewBranchLicence = LicenceDetails & {
   tenantId: string;

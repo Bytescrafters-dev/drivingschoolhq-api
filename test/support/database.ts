@@ -14,6 +14,7 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(
     `TRUNCATE
        tenant_audit_logs, tenant_user_sessions, tenant_user_branches,
+       instructor_vehicle_classes, instructor_licences, instructor_profiles,
        branch_vehicle_classes, branch_school_licences,
        tenant_users, branches, tenant_access, tenant_subscriptions, tenants,
        plan_features, plan_limits, plan_prices, price_plans,

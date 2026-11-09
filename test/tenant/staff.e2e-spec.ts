@@ -335,7 +335,11 @@ describe('Tenant staff management (e2e)', () => {
       .get('/tenant/auth/me')
       .set(bearer(clerkToken))
       .expect(200);
-    expect(me.body.user.permissions).toEqual(['STAFF_MANAGE']);
+    expect(me.body.user.permissions).toEqual([
+      'STAFF_MANAGE',
+      'INSTRUCTORS_VIEW',
+      'INSTRUCTORS_MANAGE',
+    ]);
 
     // Moving the clerk from Kandy to Main applies at once.
     await branchContext(kandy).expect(200);

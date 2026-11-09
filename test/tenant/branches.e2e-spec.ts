@@ -178,7 +178,12 @@ describe('Tenant branches (e2e)', () => {
       .expect(200);
     expect(me.body.user).toMatchObject({
       branchAccess: 'ALL',
-      permissions: ['BRANCHES_MANAGE', 'STAFF_MANAGE'],
+      permissions: [
+        'BRANCHES_MANAGE',
+        'STAFF_MANAGE',
+        'INSTRUCTORS_VIEW',
+        'INSTRUCTORS_MANAGE',
+      ],
     });
     expect(me.body.branches).toEqual([
       {
@@ -325,7 +330,7 @@ describe('Tenant branches (e2e)', () => {
       .get('/tenant/auth/me')
       .set(bearer(clerk.token))
       .expect(200);
-    expect(clerkMe.body.user.permissions).toEqual([]);
+    expect(clerkMe.body.user.permissions).toEqual(['INSTRUCTORS_VIEW']);
     const mine = await http()
       .get('/tenant/branches')
       .set(bearer(clerk.token))

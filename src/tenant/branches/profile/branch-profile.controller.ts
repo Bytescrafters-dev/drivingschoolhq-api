@@ -25,10 +25,10 @@ import {
   type LicenceChangeResult,
 } from './branch-profile.service.js';
 import {
-  CorrectBranchLicenceDto,
-  RecordBranchLicenceDto,
-  SetBranchVehicleClassesDto,
-} from './dto/branch-profile.dto.js';
+  CorrectLicenceDto,
+  RecordLicenceDto,
+  SetVehicleClassesDto,
+} from '../../../reference-data/vehicle-classes/dto/licence.dto.js';
 import {
   type BranchProfileResponse,
   toBranchProfileResponse,
@@ -55,7 +55,7 @@ export class BranchProfileController {
   async recordLicence(
     @CurrentTenantUser() actor: AuthenticatedTenantUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: RecordBranchLicenceDto,
+    @Body() body: RecordLicenceDto,
     @ReqMeta() meta: RequestMeta,
   ) {
     return toChangeResponse(
@@ -69,7 +69,7 @@ export class BranchProfileController {
   async correctLicence(
     @CurrentTenantUser() actor: AuthenticatedTenantUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: CorrectBranchLicenceDto,
+    @Body() body: CorrectLicenceDto,
     @ReqMeta() meta: RequestMeta,
   ) {
     return toChangeResponse(
@@ -82,7 +82,7 @@ export class BranchProfileController {
   async setVehicleClasses(
     @CurrentTenantUser() actor: AuthenticatedTenantUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: SetBranchVehicleClassesDto,
+    @Body() body: SetVehicleClassesDto,
     @ReqMeta() meta: RequestMeta,
   ): Promise<BranchProfileResponse> {
     return toBranchProfileResponse(

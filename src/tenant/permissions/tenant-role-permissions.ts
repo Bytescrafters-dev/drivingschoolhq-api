@@ -8,11 +8,20 @@ export const TENANT_ROLE_PERMISSIONS: Readonly<
   Record<TenantRole, readonly P[]>
 > = {
   [TenantRole.OWNER]: ALL_PERMISSIONS,
-  [TenantRole.ADMIN]: [P.BRANCHES_MANAGE, P.STAFF_MANAGE],
-  [TenantRole.BRANCH_MANAGER]: [P.STAFF_MANAGE],
-  [TenantRole.FRONT_DESK]: [],
-  [TenantRole.INSTRUCTOR]: [],
-  [TenantRole.ACCOUNTANT]: [],
+  [TenantRole.ADMIN]: [
+    P.BRANCHES_MANAGE,
+    P.STAFF_MANAGE,
+    P.INSTRUCTORS_VIEW,
+    P.INSTRUCTORS_MANAGE,
+  ],
+  [TenantRole.BRANCH_MANAGER]: [
+    P.STAFF_MANAGE,
+    P.INSTRUCTORS_VIEW,
+    P.INSTRUCTORS_MANAGE,
+  ],
+  [TenantRole.FRONT_DESK]: [P.INSTRUCTORS_VIEW],
+  [TenantRole.INSTRUCTOR]: [P.INSTRUCTORS_VIEW],
+  [TenantRole.ACCOUNTANT]: [P.INSTRUCTORS_VIEW],
 };
 
 export function tenantRoleHasPermissions(
